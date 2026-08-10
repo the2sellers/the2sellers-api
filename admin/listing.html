@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Review Listing | The2Sellers.io Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/style.css">
+</head>
+<body>
+<div id="topbar" class="topbar"></div>
+
+<div class="page" id="pageContent">
+  <div class="empty-state">Loading…</div>
+</div>
+
+<script src="/admin/app.js"></script>
+<script>
+if (requireAuthOrRedirect()) {
+  renderTopbar('listings');
+
+  const id = new URLSearchParams(window.location.search).get('id');
+  const user = getUser();
+  let listing = null;
+
+  async function load() {
+    try {
+      listing = await apiFetch('/admin/listings/' + id);
+      render();
+    } catch (err) {
+      document.getElementById('pageContent').innerHTML = '<div class="msg msg-error">' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  function render() {
+    const l = listing;
+    document.getElementById('pageContent').innerHTML = `
+      <div class="page-header">
+        <h1>${escapeHtml(l.seller_name)}'s Submission <span class="badge badge-${l.status}" style="margin-left:8px;">${l.status.replace('_',' ')}</span></h1>
+        <a href="/admin/index.html" class="btn btn-ghost">&larr; Back to queue</a>
+      </div>
+
+      <div id="msgArea"></div>
+
+      <div class="section-label">As Submitted (read-only)</div>
+      <div class="card">
+        <div class="row2">
+          <div class="field"><label>Seller</label><div>${escapeHtml(l.seller_name)} &mdash; ${escapeHtml(l.seller_email)} ${l.seller_phone ? '&mdash; ' + escapeHtml(l.seller_phone) : ''}</div></div>
+          <div class="field"><label>Storefront link</label><div>${l.storefront_link ? escapeHtml(l.storefront_link) : '—'}</div></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Years in business</label><div>${escapeHtml(l.years_in_business || '—')}</div></div>
+          <div class="field"><label>Number of SKUs</label><div>${escapeHtml(l.num_skus || '—')}</div></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Marketplaces</label><div>${escapeHtml(l.marketplaces || '—')}</div></div>
+          <div class="field"><label>Niche</label><div>${escapeHtml(l.niche || '—')}</div></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Fulfillment model</label><div>${escapeHtml(l.fulfillment_model || '—')}</div></div>
+          <div class="field"><label>Asking price</label><div>${escapeHtml(l.asking_price || 'Not given')}</div></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Monthly sales / profit</label><div>${escapeHtml(l.monthly_sales || '—')} / ${escapeHtml(l.monthly_profit || '—')}</div></div>
+          <div class="field"><label>Last 12mo sales / profit</label><div>${escapeHtml(l.last_12mo_sales || '—')} / ${escapeHtml(l.last_12mo_profit || '—')}</div></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Inventory value</label><div>${escapeHtml(l.inventory_value || 'Not given')}</div></div>
+          <div class="field"><label>Brand registered / Trademark / Patent</label><div>${escapeHtml(l.brand_registered || '—')} / ${escapeHtml(l.trademark || '—')} / ${escapeHtml(l.patent || '—')}</div></div>
+        </div>
+        <div class="field"><label>Reason for selling</label><div>${escapeHtml(l.reason_for_selling || '—')}</div></div>
+      </div>
+
+      <div class="section-label">Public Listing (edit before publishing)</div>
+      <div class="card">
+        <form id="editForm">
+          <div class="field">
+            <label for="public_title">Public title</label>
+            <input type="text" id="public_title" value="${escapeHtml(l.public_title || '')}" placeholder="e.g. Established Home &amp; Kitchen Brand — UK/US" />
+          </div>
+          <div class="field">
+            <label for="public_summary">Short summary (shown on the browse page)</label>
+            <textarea id="public_summary" rows="2">${escapeHtml(l.public_summary || '')}</textarea>
+          </div>
+          <div class="field">
+            <label for="public_description">Full description (shown on the detail page)</label>
+            <textarea id="public_description" rows="5">${escapeHtml(l.public_description || '')}</textarea>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label for="display_price">Display price</label>
+              <input type="text" id="display_price" value="${escapeHtml(l.display_price || '')}" placeholder="e.g. £250,000 or Contact for price" />
+            </div>
+            <div class="field">
+              <label for="status">Status</label>
+              <select id="status">
+                <option value="pending" ${l.status === 'pending' ? 'selected' : ''}>Pending</option>
+                <option value="in_review" ${l.status === 'in_review' ? 'selected' : ''}>In Review</option>
+                <option value="published" ${l.status === 'published' ? 'selected' : ''}>Published</option>
+                <option value="rejected" ${l.status === 'rejected' ? 'selected' : ''}>Rejected</option>
+                <option value="archived" ${l.status === 'archived' ? 'selected' : ''}>Archived</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="internal_notes">Internal notes (team only, never shown publicly)</label>
+            <textarea id="internal_notes" rows="2">${escapeHtml(l.internal_notes || '')}</textarea>
+            <span class="hint">Last reviewed by: ${l.reviewed_by ? 'user #' + l.reviewed_by : 'no one yet'}</span>
+          </div>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+          ${user.role === 'admin' ? '<button type="button" id="deleteBtn" class="btn btn-danger" style="margin-left:10px;">Delete Listing</button>' : ''}
+        </form>
+      </div>
+    `;
+
+    document.getElementById('editForm').addEventListener('submit', save);
+    const deleteBtn = document.getElementById('deleteBtn');
+    if (deleteBtn) deleteBtn.addEventListener('click', del);
+  }
+
+  async function save(e) {
+    e.preventDefault();
+    const msgArea = document.getElementById('msgArea');
+    try {
+      listing = await apiFetch('/admin/listings/' + id, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          public_title: document.getElementById('public_title').value,
+          public_summary: document.getElementById('public_summary').value,
+          public_description: document.getElementById('public_description').value,
+          display_price: document.getElementById('display_price').value,
+          status: document.getElementById('status').value,
+          internal_notes: document.getElementById('internal_notes').value
+        })
+      });
+      render();
+      document.getElementById('msgArea').innerHTML = '<div class="msg msg-success">Saved.</div>';
+    } catch (err) {
+      msgArea.innerHTML = '<div class="msg msg-error">' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  async function del() {
+    if (!confirm('Permanently delete this listing? This cannot be undone.')) return;
+    try {
+      await apiFetch('/admin/listings/' + id, { method: 'DELETE' });
+      window.location.href = '/admin/index.html';
+    } catch (err) {
+      document.getElementById('msgArea').innerHTML = '<div class="msg msg-error">' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  load();
+}
+</script>
+</body>
+</html>

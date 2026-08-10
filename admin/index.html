@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Listings | The2Sellers.io Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/style.css">
+</head>
+<body>
+<div id="topbar" class="topbar"></div>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Listings</h1>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <a class="tab" data-status="pending">Pending</a>
+    <a class="tab" data-status="in_review">In Review</a>
+    <a class="tab" data-status="published">Published</a>
+    <a class="tab" data-status="rejected">Rejected</a>
+    <a class="tab" data-status="">All</a>
+  </div>
+
+  <div id="listWrap"></div>
+</div>
+
+<script src="/admin/app.js"></script>
+<script>
+if (requireAuthOrRedirect()) {
+  renderTopbar('listings');
+
+  const params = new URLSearchParams(window.location.search);
+  let currentStatus = params.get('status') || 'pending';
+
+  function setActiveTab() {
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.toggle('active', t.getAttribute('data-status') === currentStatus);
+      t.href = '/admin/index.html' + (t.getAttribute('data-status') ? '?status=' + t.getAttribute('data-status') : '');
+    });
+  }
+
+  async function loadListings() {
+    setActiveTab();
+    const listWrap = document.getElementById('listWrap');
+    listWrap.innerHTML = '<div class="empty-state">Loading…</div>';
+    try {
+      const query = currentStatus ? '?status=' + encodeURIComponent(currentStatus) : '';
+      const listings = await apiFetch('/admin/listings' + query);
+
+      if (listings.length === 0) {
+        listWrap.innerHTML = '<div class="empty-state"><div class="icon">§</div>Nothing here yet.</div>';
+        return;
+      }
+
+      listWrap.innerHTML = listings.map(l => `
+        <a class="listing-row" href="/admin/listing.html?id=${l.id}">
+          <div>
+            <div class="title">${escapeHtml(l.public_title || l.seller_name + '\u2019s submission')}</div>
+            <div class="sub">${escapeHtml(l.seller_name)} · ${escapeHtml(l.seller_email)}</div>
+          </div>
+          <div><div class="field-label">Niche</div><div class="field-value">${escapeHtml(l.niche || '—')}</div></div>
+          <div><div class="field-label">Marketplaces</div><div class="field-value">${escapeHtml(l.marketplaces || '—')}</div></div>
+          <div><div class="field-label">Monthly Profit</div><div class="field-value">${escapeHtml(l.monthly_profit || '—')}</div></div>
+          <div><div class="field-label">Submitted</div><div class="field-value">${timeAgo(l.submitted_at)}</div></div>
+          <div><span class="badge badge-${l.status}">${l.status.replace('_',' ')}</span></div>
+        </a>
+      `).join('');
+    } catch (err) {
+      listWrap.innerHTML = '<div class="msg msg-error">' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  document.getElementById('tabs').addEventListener('click', function(e) {
+    const tab = e.target.closest('.tab');
+    if (!tab) return;
+    e.preventDefault();
+    currentStatus = tab.getAttribute('data-status');
+    history.pushState({}, '', tab.href);
+    loadListings();
+  });
+
+  loadListings();
+}
+</script>
+</body>
+</html>
