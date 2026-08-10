@@ -1,0 +1,9 @@
+node_modules/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+server.log
+*.png
+playwright_test.py
