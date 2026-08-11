@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { pool, initSchema } = require('./db');
 const { checkPassword, createToken, requireAuth, requireAdmin } = require('./auth');
+const { sendNotification } = require('./email');
 
 const app = express();
 app.use(cors());
@@ -44,6 +45,19 @@ app.post('/api/listings', ah(async (req, res) => {
     ]
   );
   res.status(201).json({ id: rows[0].id, status: 'pending' });
+
+  await sendNotification(
+    `New FBA Business For Sale — ${b.seller_name}`,
+    `A new seller submission just came in.\n\n` +
+    `Name: ${b.seller_name}\n` +
+    `Email: ${b.seller_email}\n` +
+    `Phone: ${b.seller_phone || '—'}\n` +
+    `Niche: ${b.niche || '—'}\n` +
+    `Marketplaces: ${b.marketplaces || '—'}\n` +
+    `Monthly profit: ${b.monthly_profit || '—'}\n` +
+    `Asking price: ${b.asking_price || '—'}\n\n` +
+    `Review it here: https://the2sellers-api.onrender.com/admin/index.html?status=pending`
+  );
 }));
 
 app.post('/api/buyer-inquiries', ah(async (req, res) => {
@@ -64,6 +78,20 @@ app.post('/api/buyer-inquiries', ah(async (req, res) => {
     ]
   );
   res.status(201).json({ id: rows[0].id });
+
+  await sendNotification(
+    `New FBA Buyer Inquiry — ${b.buyer_name}`,
+    `A new buyer inquiry just came in.\n\n` +
+    `Name: ${b.buyer_name}\n` +
+    `Email: ${b.buyer_email}\n` +
+    `Phone: ${b.buyer_phone || '—'}\n` +
+    `Desired marketplaces: ${b.desired_marketplaces || '—'}\n` +
+    `Preferred niche: ${b.preferred_niche || '—'}\n` +
+    `Budget: ${b.budget || '—'}\n` +
+    `Minimum monthly profit: ${b.min_monthly_profit || '—'}\n` +
+    `Timeline: ${b.timeline || '—'}\n\n` +
+    `View it here: https://the2sellers-api.onrender.com/admin/inquiries.html`
+  );
 }));
 
 // ============================================================
@@ -73,7 +101,7 @@ app.post('/api/buyer-inquiries', ah(async (req, res) => {
 app.get('/api/public/listings', ah(async (req, res) => {
   const { niche, marketplace } = req.query;
   let sql = `
-    SELECT id, public_title, public_summary, display_price, niche, marketplaces,
+    SELECT id, public_title, public_summary, display_price, public_monthly_profit, niche, marketplaces,
            fulfillment_model, published_at
     FROM listings WHERE status = 'published'
   `;
@@ -87,7 +115,7 @@ app.get('/api/public/listings', ah(async (req, res) => {
 
 app.get('/api/public/listings/:id', ah(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, public_title, public_summary, public_description, display_price,
+    `SELECT id, public_title, public_summary, public_description, display_price, public_monthly_profit,
             niche, marketplaces, fulfillment_model, years_in_business,
             num_skus, brand_registered, trademark, patent, published_at
      FROM listings WHERE id = $1 AND status = 'published'`,
@@ -95,6 +123,29 @@ app.get('/api/public/listings/:id', ah(async (req, res) => {
   );
   if (!rows[0]) return res.status(404).json({ error: 'Listing not found or not published' });
   res.json(rows[0]);
+}));
+
+// Fired when a visitor clicks "Interested? Get in touch" on a specific listing.
+// Lightweight — no auth required (public visitors trigger this), logs the click,
+// and emails the team immediately so they know which listing to expect a follow-up about.
+app.post('/api/public/listings/:id/interest', ah(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, public_title FROM listings WHERE id = $1 AND status = 'published'`,
+    [req.params.id]
+  );
+  const listing = rows[0];
+  if (!listing) return res.status(404).json({ error: 'Listing not found' });
+
+  await pool.query('INSERT INTO listing_interest (listing_id) VALUES ($1)', [listing.id]);
+  res.status(201).json({ ok: true });
+
+  await sendNotification(
+    `Someone is interested in a listing — #${listing.id}`,
+    `A visitor just clicked "Interested" on:\n\n` +
+    `${listing.public_title || 'Listing #' + listing.id}\n` +
+    `https://the2sellers.io/fba-listing.html?id=${listing.id}\n\n` +
+    `They're being sent to the buyer inquiry form now — watch for their submission.`
+  );
 }));
 
 // ============================================================
@@ -168,7 +219,7 @@ app.patch('/api/admin/listings/:id', requireAuth, ah(async (req, res) => {
   const listing = existingRows[0];
   if (!listing) return res.status(404).json({ error: 'Listing not found' });
 
-  const allowedFields = ['public_title', 'public_summary', 'public_description', 'display_price', 'status', 'internal_notes'];
+  const allowedFields = ['public_title', 'public_summary', 'public_description', 'display_price', 'public_monthly_profit', 'status', 'internal_notes'];
   const setClauses = [];
   const params = [];
 
