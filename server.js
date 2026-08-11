@@ -101,6 +101,38 @@ app.get('/api/public/listings/:id', ah(async (req, res) => {
 // ADMIN — auth
 // ============================================================
 
+// ============================================================
+// ONE-TIME SETUP — only works if zero admin accounts exist yet.
+// Lets you create the first team login without needing shell access
+// (Render's free tier doesn't include shell access). Permanently
+// disables itself the moment one admin account exists.
+// ============================================================
+
+app.get('/api/setup/status', ah(async (req, res) => {
+  const { rows } = await pool.query('SELECT COUNT(*)::int AS count FROM admin_users');
+  res.json({ setupAvailable: rows[0].count === 0 });
+}));
+
+app.post('/api/setup/create-first-admin', ah(async (req, res) => {
+  const { rows } = await pool.query('SELECT COUNT(*)::int AS count FROM admin_users');
+  if (rows[0].count > 0) {
+    return res.status(403).json({ error: 'Setup already completed — an admin account already exists.' });
+  }
+  const { name, email, password } = req.body;
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'name, email, and password are all required' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+  const { hashPassword } = require('./auth');
+  const result = await pool.query(
+    'INSERT INTO admin_users (name, email, password_hash, role) VALUES ($1,$2,$3,$4) RETURNING id',
+    [name, email, hashPassword(password), 'admin']
+  );
+  res.status(201).json({ id: result.rows[0].id, message: 'First admin account created.' });
+}));
+
 app.post('/api/admin/login', ah(async (req, res) => {
   const { email, password } = req.body;
   const { rows } = await pool.query('SELECT * FROM admin_users WHERE email = $1', [email]);
