@@ -49,6 +49,7 @@ async function initSchema() {
       public_summary TEXT,
       public_description TEXT,
       display_price TEXT,
+      public_monthly_profit TEXT,
 
       status TEXT NOT NULL DEFAULT 'pending',
       reviewed_by INTEGER REFERENCES admin_users(id),
@@ -57,6 +58,12 @@ async function initSchema() {
       submitted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       published_at TIMESTAMPTZ
+    );
+
+    CREATE TABLE IF NOT EXISTS listing_interest (
+      id SERIAL PRIMARY KEY,
+      listing_id INTEGER REFERENCES listings(id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
     CREATE TABLE IF NOT EXISTS buyer_inquiries (
@@ -77,6 +84,9 @@ async function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status);
     CREATE INDEX IF NOT EXISTS idx_listings_niche ON listings(niche);
   `);
+
+  // Safe migration: adds the column if this table already existed before this field was introduced.
+  await pool.query(`ALTER TABLE listings ADD COLUMN IF NOT EXISTS public_monthly_profit TEXT;`);
 }
 
 module.exports = { pool, initSchema };
