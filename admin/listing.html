@@ -94,6 +94,13 @@ if (requireAuthOrRedirect()) {
               <input type="text" id="display_price" value="${escapeHtml(l.display_price || '')}" placeholder="e.g. £250,000 or Contact for price" />
             </div>
             <div class="field">
+              <label for="public_monthly_profit">Monthly net profit (public)</label>
+              <input type="text" id="public_monthly_profit" value="${escapeHtml(l.public_monthly_profit || '')}" placeholder="e.g. £9,000/mo" />
+              <span class="hint">Raw figure the seller gave: ${escapeHtml(l.monthly_profit || 'not given')}</span>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field">
               <label for="status">Status</label>
               <select id="status">
                 <option value="pending" ${l.status === 'pending' ? 'selected' : ''}>Pending</option>
@@ -103,6 +110,7 @@ if (requireAuthOrRedirect()) {
                 <option value="archived" ${l.status === 'archived' ? 'selected' : ''}>Archived</option>
               </select>
             </div>
+          </div>
           </div>
           <div class="field">
             <label for="internal_notes">Internal notes (team only, never shown publicly)</label>
@@ -130,6 +138,7 @@ if (requireAuthOrRedirect()) {
           public_title: document.getElementById('public_title').value,
           public_summary: document.getElementById('public_summary').value,
           public_description: document.getElementById('public_description').value,
+          public_monthly_profit: document.getElementById('public_monthly_profit').value,
           display_price: document.getElementById('display_price').value,
           status: document.getElementById('status').value,
           internal_notes: document.getElementById('internal_notes').value
