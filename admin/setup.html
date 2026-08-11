@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>First-Time Setup | The2Sellers.io</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="brand">The2Sellers<span>.io</span></div>
+    <div class="sub">First-Time Setup — Create Your Admin Login</div>
+    <div id="msgArea"></div>
+
+    <div id="formArea">
+      <form id="setupForm">
+        <div class="field">
+          <label for="name">Your full name</label>
+          <input type="text" id="name" required />
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" required minlength="8" />
+          <span class="hint">At least 8 characters.</span>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Admin Account</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+var API_BASE = window.location.origin + '/api';
+
+fetch(API_BASE + '/setup/status')
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (!data.setupAvailable) {
+      document.getElementById('formArea').innerHTML =
+        '<div class="msg msg-success">Setup already completed — an admin account already exists. ' +
+        '<a href="/admin/login.html" style="color: inherit; text-decoration: underline;">Go to login</a></div>';
+    }
+  });
+
+document.getElementById('setupForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var msgArea = document.getElementById('msgArea');
+  msgArea.innerHTML = '';
+
+  fetch(API_BASE + '/setup/create-first-admin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: document.getElementById('name').value,
+      email: document.getElementById('email').value,
+      password: document.getElementById('password').value
+    })
+  })
+    .then(function(res) { return res.json().then(function(body) { return { ok: res.ok, body: body }; }); })
+    .then(function(result) {
+      if (!result.ok) throw new Error(result.body.error || 'Setup failed');
+      document.getElementById('formArea').innerHTML =
+        '<div class="msg msg-success">Admin account created. You can now <a href="/admin/login.html" style="color: inherit; text-decoration: underline;">log in here</a>.</div>';
+    })
+    .catch(function(err) {
+      msgArea.innerHTML = '<div class="msg msg-error">' + err.message.replace(/[<>]/g, '') + '</div>';
+    });
+});
+</script>
+</body>
+</html>
