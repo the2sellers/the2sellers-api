@@ -6,7 +6,7 @@
 const NOTIFY_TO = process.env.NOTIFY_EMAIL || 'contact@the2sellers.io';
 const FROM_ADDRESS = process.env.RESEND_FROM || 'The2Sellers.io <onboarding@resend.dev>';
 
-async function sendNotification(subject, textBody) {
+async function sendNotification(subject, textBody, attachments) {
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
@@ -15,18 +15,25 @@ async function sendNotification(subject, textBody) {
   }
 
   try {
+    const payload = {
+      from: FROM_ADDRESS,
+      to: [NOTIFY_TO],
+      subject: subject,
+      text: textBody
+    };
+    if (attachments && attachments.length > 0) {
+      payload.attachments = attachments.map(function(a) {
+        return { filename: a.filename, content: a.content };
+      });
+    }
+
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + apiKey,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        from: FROM_ADDRESS,
-        to: [NOTIFY_TO],
-        subject: subject,
-        text: textBody
-      })
+      body: JSON.stringify(payload)
     });
 
     if (!res.ok) {

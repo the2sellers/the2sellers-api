@@ -2,6 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { pool, initSchema } = require('./db');
+const multer = require('multer');
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 8 } // 10MB per file, max 8 files
+});
 const { checkPassword, createToken, requireAuth, requireAdmin } = require('./auth');
 const { sendNotification } = require('./email');
 
@@ -270,7 +275,7 @@ const SERVICE_LABELS = {
   general_contact: 'General Contact Form'
 };
 
-app.post('/api/service-inquiries', ah(async (req, res) => {
+app.post('/api/service-inquiries', upload.array('files', 8), ah(async (req, res) => {
   const b = req.body;
   if (!b.service_type || !b.full_name || !b.email) {
     return res.status(400).json({ error: 'service_type, full_name, and email are required' });
@@ -283,6 +288,14 @@ app.post('/api/service-inquiries', ah(async (req, res) => {
   res.status(201).json({ id: rows[0].id });
 
   const label = SERVICE_LABELS[b.service_type] || b.service_type;
+  const files = req.files || [];
+  const attachments = files.map(function(f) {
+    return { filename: f.originalname, content: f.buffer.toString('base64') };
+  });
+  const fileNote = files.length > 0
+    ? `\n\nAttached files (${files.length}): ${files.map(function(f) { return f.originalname; }).join(', ')}`
+    : '';
+
   await sendNotification(
     `New ${label} Inquiry — ${b.full_name}`,
     `A new inquiry came in via ${label}.\n\n` +
@@ -290,8 +303,9 @@ app.post('/api/service-inquiries', ah(async (req, res) => {
     `Email: ${b.email}\n` +
     `Phone: ${b.phone || '—'}\n` +
     `WhatsApp: ${b.whatsapp || '—'}\n\n` +
-    `Details:\n${b.details || '—'}\n\n` +
-    `View it here: https://the2sellers-api.onrender.com/admin/service-inquiries.html`
+    `Details:\n${b.details || '—'}${fileNote}\n\n` +
+    `View it here: https://the2sellers-api.onrender.com/admin/service-inquiries.html`,
+    attachments
   );
 }));
 
@@ -402,6 +416,20 @@ app.delete('/api/admin/blog-posts/:id', requireAuth, requireAdmin, ah(async (req
 }));
 
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+
+// Multer-specific errors (file too large, too many files) get a clear message
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'One of your files is too large. Each file must be under 10MB.' });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ error: 'Too many files — please attach 8 or fewer.' });
+    }
+    return res.status(400).json({ error: 'File upload error: ' + err.message });
+  }
+  next(err);
+});
 
 // Generic error handler — logs the real error server-side, never leaks internals to the client
 app.use((err, req, res, next) => {
