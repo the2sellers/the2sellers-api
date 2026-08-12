@@ -83,6 +83,33 @@ async function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status);
     CREATE INDEX IF NOT EXISTS idx_listings_niche ON listings(niche);
+
+    CREATE TABLE IF NOT EXISTS service_inquiries (
+      id SERIAL PRIMARY KEY,
+      service_type TEXT NOT NULL, -- 'ppc_audit' | 'account_management' | 'listing_optimizer' | 'general_contact'
+      full_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      whatsapp TEXT,
+      details TEXT,
+      submitted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_service_inquiries_type ON service_inquiries(service_type);
+
+    CREATE TABLE IF NOT EXISTS blog_posts (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      excerpt TEXT,
+      content TEXT,
+      author TEXT,
+      status TEXT NOT NULL DEFAULT 'draft', -- 'draft' | 'published'
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      published_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_blog_posts_status ON blog_posts(status);
+    CREATE INDEX IF NOT EXISTS idx_blog_posts_slug ON blog_posts(slug);
   `);
 
   // Safe migration: adds the column if this table already existed before this field was introduced.

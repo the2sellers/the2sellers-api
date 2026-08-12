@@ -258,6 +258,149 @@ app.get('/api/admin/buyer-inquiries', requireAuth, ah(async (req, res) => {
 
 // ============================================================
 
+// ============================================================
+// SERVICE INQUIRIES — PPC Audit, Account Management, Listing
+// Optimizer, and the general Contact Us form all funnel here.
+// ============================================================
+
+const SERVICE_LABELS = {
+  ppc_audit: 'PPC Audit',
+  account_management: 'Account Management',
+  listing_optimizer: 'Listing Optimizer',
+  general_contact: 'General Contact Form'
+};
+
+app.post('/api/service-inquiries', ah(async (req, res) => {
+  const b = req.body;
+  if (!b.service_type || !b.full_name || !b.email) {
+    return res.status(400).json({ error: 'service_type, full_name, and email are required' });
+  }
+  const { rows } = await pool.query(
+    `INSERT INTO service_inquiries (service_type, full_name, email, phone, whatsapp, details)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+    [b.service_type, b.full_name, b.email, b.phone || null, b.whatsapp || null, b.details || null]
+  );
+  res.status(201).json({ id: rows[0].id });
+
+  const label = SERVICE_LABELS[b.service_type] || b.service_type;
+  await sendNotification(
+    `New ${label} Inquiry — ${b.full_name}`,
+    `A new inquiry came in via ${label}.\n\n` +
+    `Name: ${b.full_name}\n` +
+    `Email: ${b.email}\n` +
+    `Phone: ${b.phone || '—'}\n` +
+    `WhatsApp: ${b.whatsapp || '—'}\n\n` +
+    `Details:\n${b.details || '—'}\n\n` +
+    `View it here: https://the2sellers-api.onrender.com/admin/service-inquiries.html`
+  );
+}));
+
+app.get('/api/admin/service-inquiries', requireAuth, ah(async (req, res) => {
+  const { service_type } = req.query;
+  let sql = 'SELECT * FROM service_inquiries';
+  const params = [];
+  if (service_type) { params.push(service_type); sql += ' WHERE service_type = $1'; }
+  sql += ' ORDER BY submitted_at DESC';
+  const { rows } = await pool.query(sql, params);
+  res.json(rows);
+}));
+
+// ============================================================
+// BLOG — same admin panel, new section. Public read-only
+// endpoints only return published posts.
+// ============================================================
+
+function slugify(title) {
+  return String(title).toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 80);
+}
+
+app.get('/api/public/blog-posts', ah(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, title, slug, excerpt, author, published_at
+     FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC`
+  );
+  res.json(rows);
+}));
+
+app.get('/api/public/blog-posts/:slug', ah(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, title, slug, excerpt, content, author, published_at
+     FROM blog_posts WHERE slug = $1 AND status = 'published'`,
+    [req.params.slug]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Post not found or not published' });
+  res.json(rows[0]);
+}));
+
+app.get('/api/admin/blog-posts', requireAuth, ah(async (req, res) => {
+  const { status } = req.query;
+  let sql = 'SELECT * FROM blog_posts';
+  const params = [];
+  if (status) { params.push(status); sql += ' WHERE status = $1'; }
+  sql += ' ORDER BY updated_at DESC';
+  const { rows } = await pool.query(sql, params);
+  res.json(rows);
+}));
+
+app.get('/api/admin/blog-posts/:id', requireAuth, ah(async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM blog_posts WHERE id = $1', [req.params.id]);
+  if (!rows[0]) return res.status(404).json({ error: 'Post not found' });
+  res.json(rows[0]);
+}));
+
+app.post('/api/admin/blog-posts', requireAuth, ah(async (req, res) => {
+  const { title } = req.body;
+  if (!title) return res.status(400).json({ error: 'title is required' });
+
+  let slug = slugify(title);
+  const { rows: existing } = await pool.query('SELECT id FROM blog_posts WHERE slug = $1', [slug]);
+  if (existing.length > 0) slug = slug + '-' + Date.now().toString().slice(-5);
+
+  const { rows } = await pool.query(
+    `INSERT INTO blog_posts (title, slug, author) VALUES ($1, $2, $3) RETURNING id`,
+    [title, slug, req.user.name || 'The2Sellers.io Team']
+  );
+  res.status(201).json({ id: rows[0].id, slug });
+}));
+
+app.patch('/api/admin/blog-posts/:id', requireAuth, ah(async (req, res) => {
+  const { rows: existingRows } = await pool.query('SELECT * FROM blog_posts WHERE id = $1', [req.params.id]);
+  const post = existingRows[0];
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+
+  const allowedFields = ['title', 'excerpt', 'content', 'author', 'status'];
+  const setClauses = [];
+  const params = [];
+  allowedFields.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      params.push(req.body[field]);
+      setClauses.push(`${field} = $${params.length}`);
+    }
+  });
+  if (setClauses.length === 0) return res.status(400).json({ error: 'No valid fields to update' });
+
+  setClauses.push(`updated_at = now()`);
+  if (req.body.status === 'published' && post.status !== 'published') {
+    setClauses.push(`published_at = now()`);
+  }
+
+  params.push(req.params.id);
+  const { rows } = await pool.query(
+    `UPDATE blog_posts SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`,
+    params
+  );
+  res.json(rows[0]);
+}));
+
+app.delete('/api/admin/blog-posts/:id', requireAuth, requireAdmin, ah(async (req, res) => {
+  await pool.query('DELETE FROM blog_posts WHERE id = $1', [req.params.id]);
+  res.status(204).send();
+}));
+
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 // Generic error handler — logs the real error server-side, never leaks internals to the client
