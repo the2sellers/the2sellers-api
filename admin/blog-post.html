@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Write Post | The2Sellers.io Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/style.css">
+<style>
+  .field textarea#content { min-height: 320px; font-family: monospace; font-size: 13px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div id="topbar" class="topbar"></div>
+
+<div class="page" id="pageContent">
+  <div class="empty-state">Loading…</div>
+</div>
+
+<script src="/admin/app.js"></script>
+<script>
+if (requireAuthOrRedirect()) {
+  renderTopbar('blog');
+
+  const id = new URLSearchParams(window.location.search).get('id');
+  let post = null;
+
+  async function load() {
+    if (!id) {
+      post = { title: '', excerpt: '', content: '', status: 'draft' };
+      render(true);
+      return;
+    }
+    try {
+      post = await apiFetch('/admin/blog-posts/' + id);
+      render(false);
+    } catch (err) {
+      document.getElementById('pageContent').innerHTML = '<div class="msg msg-error">' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  function render(isNew) {
+    const p = post;
+    document.getElementById('pageContent').innerHTML = `
+      <div class="page-header">
+        <h1>${isNew ? 'New Post' : 'Edit Post'} ${!isNew ? '<span class="badge badge-' + (p.status === 'published' ? 'published' : 'pending') + '" style="margin-left:8px;">' + p.status + '</span>' : ''}</h1>
+        <a href="/admin/blog.html" class="btn btn-ghost">&larr; Back to all posts</a>
+      </div>
+
+      <div id="msgArea"></div>
+
+      <div class="card">
+        <form id="postForm">
+          <div class="field">
+            <label for="title">Title</label>
+            <input type="text" id="title" value="${escapeHtml(p.title || '')}" required />
+          </div>
+          <div class="field">
+            <label for="excerpt">Short excerpt <span class="hint" style="font-weight:400;">(shown on the blog list page)</span></label>
+            <textarea id="excerpt" rows="2">${escapeHtml(p.excerpt || '')}</textarea>
+          </div>
+          <div class="field">
+            <label for="content">Full post content</label>
+            <textarea id="content">${escapeHtml(p.content || '')}</textarea>
+            <span class="hint">Plain paragraphs are fine — separate paragraphs with a blank line. Basic HTML tags like &lt;b&gt;, &lt;i&gt;, and &lt;a&gt; also work if you want them.</span>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label for="status">Status</label>
+              <select id="status">
+                <option value="draft" ${p.status === 'draft' ? 'selected' : ''}>Draft</option>
+                <option value="published" ${p.status === 'published' ? 'selected' : ''}>Published</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Slug</label>
+              <div style="padding:11px 13px; color:var(--slate); font-size:13.5px;">${p.slug ? '/' + escapeHtml(p.slug) + ' (set automatically, not editable)' : 'Generated automatically when you save'}</div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">${isNew ? 'Create Post' : 'Save Changes'}</button>
+          ${!isNew ? '<button type="button" id="deleteBtn" class="btn btn-danger" style="margin-left:10px;">Delete Post</button>' : ''}
+        </form>
+      </div>
+    `;
+
+    document.getElementById('postForm').addEventListener('submit', isNew ? create : save);
+    const deleteBtn = document.getElementById('deleteBtn');
+    if (deleteBtn) deleteBtn.addEventListener('click', del);
+  }
+
+  async function create(e) {
+    e.preventDefault();
+    const msgArea = document.getElementById('msgArea');
+    try {
+      const created = await apiFetch('/admin/blog-posts', {
+        method: 'POST',
+        body: JSON.stringify({ title: document.getElementById('title').value })
+      });
+      // Immediately save the rest of the fields onto the newly created post
+      await apiFetch('/admin/blog-posts/' + created.id, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          excerpt: document.getElementById('excerpt').value,
+          content: document.getElementById('content').value,
+          status: document.getElementById('status').value
+        })
+      });
+      window.location.href = '/admin/blog-post.html?id=' + created.id;
+    } catch (err) {
+      msgArea.innerHTML = '<div class="msg msg-error">' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  async function save(e) {
+    e.preventDefault();
+    const msgArea = document.getElementById('msgArea');
+    try {
+      post = await apiFetch('/admin/blog-posts/' + id, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title: document.getElementById('title').value,
+          excerpt: document.getElementById('excerpt').value,
+          content: document.getElementById('content').value,
+          status: document.getElementById('status').value
+        })
+      });
+      render(false);
+      document.getElementById('msgArea').innerHTML = '<div class="msg msg-success">Saved.</div>';
+    } catch (err) {
+      msgArea.innerHTML = '<div class="msg msg-error">' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  async function del() {
+    if (!confirm('Permanently delete this post? This cannot be undone.')) return;
+    try {
+      await apiFetch('/admin/blog-posts/' + id, { method: 'DELETE' });
+      window.location.href = '/admin/blog.html';
+    } catch (err) {
+      document.getElementById('msgArea').innerHTML = '<div class="msg msg-error">' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  load();
+}
+</script>
+</body>
+</html>
