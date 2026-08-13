@@ -103,11 +103,31 @@ app.post('/api/buyer-inquiries', ah(async (req, res) => {
 // PUBLIC — browse published listings
 // ============================================================
 
+app.get('/api/public/site-settings', ah(async (req, res) => {
+  const { rows } = await pool.query('SELECT facebook_url, youtube_url, linkedin_url FROM site_settings WHERE id = 1');
+  res.json(rows[0] || { facebook_url: null, youtube_url: null, linkedin_url: null });
+}));
+
+app.get('/api/admin/site-settings', requireAuth, ah(async (req, res) => {
+  const { rows } = await pool.query('SELECT facebook_url, youtube_url, linkedin_url FROM site_settings WHERE id = 1');
+  res.json(rows[0] || { facebook_url: null, youtube_url: null, linkedin_url: null });
+}));
+
+app.patch('/api/admin/site-settings', requireAuth, ah(async (req, res) => {
+  const { facebook_url, youtube_url, linkedin_url } = req.body;
+  const { rows } = await pool.query(
+    `UPDATE site_settings SET facebook_url = $1, youtube_url = $2, linkedin_url = $3, updated_at = NOW()
+     WHERE id = 1 RETURNING facebook_url, youtube_url, linkedin_url`,
+    [facebook_url || null, youtube_url || null, linkedin_url || null]
+  );
+  res.json(rows[0]);
+}));
+
 app.get('/api/public/listings', ah(async (req, res) => {
   const { niche, marketplace } = req.query;
   let sql = `
     SELECT id, public_title, public_summary, display_price, public_monthly_profit, niche, marketplaces,
-           fulfillment_model, published_at
+           fulfillment_model, sale_status, published_at
     FROM listings WHERE status = 'published'
   `;
   const params = [];
@@ -121,7 +141,7 @@ app.get('/api/public/listings', ah(async (req, res) => {
 app.get('/api/public/listings/:id', ah(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT id, public_title, public_summary, public_description, display_price, public_monthly_profit,
-            niche, marketplaces, fulfillment_model, years_in_business,
+            niche, marketplaces, fulfillment_model, sale_status, years_in_business,
             num_skus, brand_registered, trademark, patent, published_at
      FROM listings WHERE id = $1 AND status = 'published'`,
     [req.params.id]
@@ -224,7 +244,7 @@ app.patch('/api/admin/listings/:id', requireAuth, ah(async (req, res) => {
   const listing = existingRows[0];
   if (!listing) return res.status(404).json({ error: 'Listing not found' });
 
-  const allowedFields = ['public_title', 'public_summary', 'public_description', 'display_price', 'public_monthly_profit', 'status', 'internal_notes'];
+  const allowedFields = ['public_title', 'public_summary', 'public_description', 'display_price', 'public_monthly_profit', 'sale_status', 'status', 'internal_notes'];
   const setClauses = [];
   const params = [];
 

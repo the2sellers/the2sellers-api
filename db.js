@@ -114,6 +114,22 @@ async function initSchema() {
 
   // Safe migration: adds the column if this table already existed before this field was introduced.
   await pool.query(`ALTER TABLE listings ADD COLUMN IF NOT EXISTS public_monthly_profit TEXT;`);
+  // 'available' | 'under_offer' | 'sold' — independent of the review-workflow status above.
+  // A published listing can be sold/under offer and still stay visible with the right badge.
+  await pool.query(`ALTER TABLE listings ADD COLUMN IF NOT EXISTS sale_status TEXT NOT NULL DEFAULT 'available';`);
+
+  // Single-row table holding site-wide settings (currently just social links).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS site_settings (
+      id INT PRIMARY KEY DEFAULT 1,
+      facebook_url TEXT,
+      youtube_url TEXT,
+      linkedin_url TEXT,
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      CONSTRAINT site_settings_single_row CHECK (id = 1)
+    );
+  `);
+  await pool.query(`INSERT INTO site_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;`);
 }
 
 module.exports = { pool, initSchema };
