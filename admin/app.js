@@ -56,6 +56,7 @@ function renderTopbar(activePage) {
       <a href="/admin/inquiries.html" class="${activePage === 'inquiries' ? 'active' : ''}">Buyer Inquiries</a>
       <a href="/admin/service-inquiries.html" class="${activePage === 'service-inquiries' ? 'active' : ''}">Service Inquiries</a>
       <a href="/admin/blog.html" class="${activePage === 'blog' ? 'active' : ''}">Blog</a>
+      <a href="/admin/settings.html" class="${activePage === 'settings' ? 'active' : ''}">Settings</a>
     </nav>
     <div class="user">
       <span>${user ? user.name + ' · ' + user.role : ''}</span>

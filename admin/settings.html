@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Settings | The2Sellers.io Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/style.css">
+</head>
+<body>
+<div id="topbar" class="topbar"></div>
+
+<div class="page">
+  <div class="page-header"><h1>Site Settings</h1></div>
+  <div class="detail-card" style="max-width: 640px;">
+    <h3>Social Media Links</h3>
+    <p class="sub" style="margin-bottom: 20px;">These show as icons in your site's footer. Leave any field blank to hide that icon.</p>
+    <div id="msgArea"></div>
+    <div class="field">
+      <label for="facebook_url">Facebook URL</label>
+      <input type="url" id="facebook_url" placeholder="https://facebook.com/the2sellers" />
+    </div>
+    <div class="field">
+      <label for="youtube_url">YouTube URL</label>
+      <input type="url" id="youtube_url" placeholder="https://youtube.com/@the2sellers" />
+    </div>
+    <div class="field">
+      <label for="linkedin_url">LinkedIn URL</label>
+      <input type="url" id="linkedin_url" placeholder="https://linkedin.com/company/the2sellers" />
+    </div>
+    <button class="btn-primary" id="saveBtn" type="button">Save Settings</button>
+  </div>
+</div>
+
+<script src="/admin/app.js"></script>
+<script>
+if (requireAuthOrRedirect()) {
+  renderTopbar('settings');
+
+  async function load() {
+    try {
+      const s = await apiFetch('/admin/site-settings');
+      document.getElementById('facebook_url').value = s.facebook_url || '';
+      document.getElementById('youtube_url').value = s.youtube_url || '';
+      document.getElementById('linkedin_url').value = s.linkedin_url || '';
+    } catch (err) {
+      document.getElementById('msgArea').innerHTML = '<div class="msg msg-error">' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  document.getElementById('saveBtn').addEventListener('click', async function() {
+    const btn = this;
+    const msgArea = document.getElementById('msgArea');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      await apiFetch('/admin/site-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          facebook_url: document.getElementById('facebook_url').value.trim(),
+          youtube_url: document.getElementById('youtube_url').value.trim(),
+          linkedin_url: document.getElementById('linkedin_url').value.trim()
+        })
+      });
+      msgArea.innerHTML = '<div class="msg msg-success">Saved.</div>';
+    } catch (err) {
+      msgArea.innerHTML = '<div class="msg msg-error">' + escapeHtml(err.message) + '</div>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save Settings';
+    }
+  });
+
+  load();
+}
+</script>
+</body>
+</html>
