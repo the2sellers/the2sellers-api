@@ -360,6 +360,50 @@ app.get('/api/public/blog-posts', ah(async (req, res) => {
   res.json(rows);
 }));
 
+// Dynamic sitemap: static pages (fixed list below) + every published blog post,
+// pulled live from the database so new posts never have to be added by hand.
+app.get('/api/sitemap.xml', ah(async (req, res) => {
+  const SITE = 'https://the2sellers.io';
+  const staticPages = [
+    { loc: `${SITE}/`, changefreq: 'weekly', priority: '1.0' },
+    { loc: `${SITE}/portfolio.html`, changefreq: 'monthly', priority: '0.9' },
+    { loc: `${SITE}/services.html`, changefreq: 'monthly', priority: '0.9' },
+    { loc: `${SITE}/ppc-audit.html`, changefreq: 'monthly', priority: '0.9' },
+    { loc: `${SITE}/account-management.html`, changefreq: 'monthly', priority: '0.9' },
+    { loc: `${SITE}/buy-sell-fba.html`, changefreq: 'monthly', priority: '0.9' },
+    { loc: `${SITE}/browse-fba.html`, changefreq: 'weekly', priority: '0.8' },
+    { loc: `${SITE}/blog.html`, changefreq: 'weekly', priority: '0.7' },
+    { loc: `${SITE}/privacy-policy.html`, changefreq: 'yearly', priority: '0.3' },
+  ];
+
+  const { rows: posts } = await pool.query(
+    `SELECT slug, published_at, updated_at FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC`
+  );
+
+  const fmtDate = (d) => new Date(d).toISOString().slice(0, 10);
+
+  const staticXml = staticPages.map(p => `<url>
+<loc>${p.loc}</loc>
+<lastmod>${fmtDate(new Date())}</lastmod>
+<changefreq>${p.changefreq}</changefreq>
+<priority>${p.priority}</priority>
+</url>`).join('\n');
+
+  const postsXml = posts.map(p => `<url>
+<loc>${SITE}/blog-post.html?slug=${encodeURIComponent(p.slug)}</loc>
+<lastmod>${fmtDate(p.updated_at || p.published_at)}</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.6</priority>
+</url>`).join('\n');
+
+  res.set('Content-Type', 'application/xml');
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${staticXml}
+${postsXml}
+</urlset>`);
+}));
+
 app.get('/api/public/blog-posts/:slug', ah(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT id, title, slug, excerpt, content, author, published_at
