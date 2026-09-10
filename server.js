@@ -17,6 +17,20 @@ app.use('/admin', express.static(require('path').join(__dirname, 'admin')));
 
 const PORT = process.env.PORT || 4000;
 
+// Tells Bing (and other IndexNow-compatible engines) about a page the moment
+// it goes live, instead of waiting for their normal crawl schedule. Never
+// throws - if this fails for any reason, publishing itself should still succeed.
+const INDEXNOW_KEY = 'bf71bc2fa0d15d5124517f40712e7877';
+async function pingIndexNow(slug) {
+  try {
+    const url = `https://the2sellers.io/blog-post.html?slug=${encodeURIComponent(slug)}`;
+    const pingUrl = `https://www.bing.com/indexnow?url=${encodeURIComponent(url)}&key=${INDEXNOW_KEY}`;
+    await fetch(pingUrl);
+  } catch (err) {
+    console.error('IndexNow ping failed (non-fatal):', err.message);
+  }
+}
+
 // Wrap async route handlers so thrown errors reach Express's error handler
 // instead of crashing the process or hanging the request.
 const ah = (fn) => (req, res, next) => fn(req, res, next).catch(next);
@@ -471,6 +485,13 @@ app.patch('/api/admin/blog-posts/:id', requireAuth, ah(async (req, res) => {
     `UPDATE blog_posts SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`,
     params
   );
+
+  // Notify Bing the moment a post is published or updated while already live -
+  // fire-and-forget, doesn't delay the response to the admin panel.
+  if (rows[0].status === 'published') {
+    pingIndexNow(rows[0].slug);
+  }
+
   res.json(rows[0]);
 }));
 
