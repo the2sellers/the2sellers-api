@@ -141,62 +141,100 @@ app.patch('/api/admin/site-settings', requireAuth, ah(async (req, res) => {
 // HOMEPAGE BANNERS
 // ============================================================
 
+// Separate, smaller upload limit for banner images specifically — these load
+// on every homepage visit, so a tighter cap than the 10MB inquiry-attachment
+// limit keeps the page fast. Stored as a base64 data URI directly in the
+// database row, since Render's own disk doesn't persist across deploys.
+const uploadBannerImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPG, PNG, WEBP, or GIF images are allowed.'));
+  }
+});
+
 app.get('/api/public/banners', ah(async (req, res) => {
-    const { rows } = await pool.query(
-          `SELECT id, label, head, sub, badge, dest FROM banners
-               WHERE is_active = true ORDER BY display_order ASC, id ASC`
-        );
-    res.json(rows);
+  const { rows } = await pool.query(
+    `SELECT id, label, head, sub, badge, dest, layout, image_data FROM banners
+     WHERE is_active = true ORDER BY display_order ASC, id ASC`
+  );
+  res.json(rows);
 }));
 
 app.get('/api/admin/banners', requireAuth, ah(async (req, res) => {
-    const { rows } = await pool.query(
-          `SELECT * FROM banners ORDER BY display_order ASC, id ASC`
-        );
-    res.json(rows);
+  const { rows } = await pool.query(
+    `SELECT * FROM banners ORDER BY display_order ASC, id ASC`
+  );
+  res.json(rows);
 }));
 
 app.get('/api/admin/banners/:id', requireAuth, ah(async (req, res) => {
-    const { rows } = await pool.query('SELECT * FROM banners WHERE id = $1', [req.params.id]);
-    if (!rows[0]) return res.status(404).json({ error: 'Banner not found' });
-    res.json(rows[0]);
+  const { rows } = await pool.query('SELECT * FROM banners WHERE id = $1', [req.params.id]);
+  if (!rows[0]) return res.status(404).json({ error: 'Banner not found' });
+  res.json(rows[0]);
 }));
 
-app.post('/api/admin/banners', requireAuth, ah(async (req, res) => {
-    const { label, head, sub, badge, dest, display_order, is_active } = req.body;
-    if (!label || !head) return res.status(400).json({ error: 'label and head are required' });
-    const { rows } = await pool.query(
-          `INSERT INTO banners (label, head, sub, badge, dest, display_order, is_active)
-               VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-          [label, head, sub || null, badge || null, dest || null, display_order ?? 0, is_active ?? true]
-        );
-    res.status(201).json(rows[0]);
+app.post('/api/admin/banners', requireAuth, uploadBannerImage.single('image'), ah(async (req, res) => {
+  const { label, head, sub, badge, dest, layout, display_order, is_active } = req.body;
+  if (!label || !head) return res.status(400).json({ error: 'label and head are required' });
+
+  let image_data = null;
+  if (req.file) {
+    image_data = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+  }
+
+  const is_active_val = (is_active === undefined) ? true : (is_active === true || is_active === 'true');
+  const display_order_val = (display_order === undefined || display_order === '') ? 0 : parseInt(display_order, 10);
+
+  const { rows } = await pool.query(
+    `INSERT INTO banners (label, head, sub, badge, dest, layout, image_data, display_order, is_active)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    [label, head, sub || null, badge || null, dest || null, layout || 'text', image_data, display_order_val, is_active_val]
+  );
+  res.status(201).json(rows[0]);
 }));
 
-app.patch('/api/admin/banners/:id', requireAuth, ah(async (req, res) => {
-    const fields = ['label', 'head', 'sub', 'badge', 'dest', 'display_order', 'is_active'];
-    const setClauses = [];
-    const params = [];
-    fields.forEach((f) => {
-          if (req.body[f] !== undefined) {
-                  params.push(req.body[f]);
-                  setClauses.push(`${f} = $${params.length}`);
-          }
-    });
-    if (setClauses.length === 0) return res.status(400).json({ error: 'No fields to update' });
-    setClauses.push('updated_at = NOW()');
-    params.push(req.params.id);
-    const { rows } = await pool.query(
-          `UPDATE banners SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`,
-          params
-        );
-    if (!rows[0]) return res.status(404).json({ error: 'Banner not found' });
-    res.json(rows[0]);
+app.patch('/api/admin/banners/:id', requireAuth, uploadBannerImage.single('image'), ah(async (req, res) => {
+  const fields = ['label', 'head', 'sub', 'badge', 'dest', 'layout', 'display_order', 'is_active'];
+  const setClauses = [];
+  const params = [];
+  fields.forEach((f) => {
+    if (req.body[f] !== undefined) {
+      let val = req.body[f];
+      if (f === 'is_active') val = (val === true || val === 'true');
+      if (f === 'display_order') val = parseInt(val, 10);
+      params.push(val);
+      setClauses.push(`${f} = $${params.length}`);
+    }
+  });
+
+  // A new image was uploaded — replace the stored one.
+  if (req.file) {
+    const image_data = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    params.push(image_data);
+    setClauses.push(`image_data = $${params.length}`);
+  }
+  // Explicit "remove the current image, don't replace it" request.
+  if (req.body.remove_image === 'true' || req.body.remove_image === true) {
+    setClauses.push(`image_data = NULL`);
+  }
+
+  if (setClauses.length === 0) return res.status(400).json({ error: 'No fields to update' });
+  setClauses.push('updated_at = NOW()');
+  params.push(req.params.id);
+  const { rows } = await pool.query(
+    `UPDATE banners SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`,
+    params
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Banner not found' });
+  res.json(rows[0]);
 }));
 
 app.delete('/api/admin/banners/:id', requireAuth, requireAdmin, ah(async (req, res) => {
-    await pool.query('DELETE FROM banners WHERE id = $1', [req.params.id]);
-    res.json({ ok: true });
+  await pool.query('DELETE FROM banners WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
 }));
 
 app.get('/api/public/listings', ah(async (req, res) => {
@@ -568,7 +606,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISO
 app.use((err, req, res, next) => {
     if (err instanceof multer.MulterError) {
           if (err.code === 'LIMIT_FILE_SIZE') {
-                  return res.status(400).json({ error: 'One of your files is too large. Each file must be under 10MB.' });
+                  return res.status(400).json({ error: 'That file is too large.' });
           }
           if (err.code === 'LIMIT_FILE_COUNT') {
                   return res.status(400).json({ error: 'Too many files — please attach 8 or fewer.' });
