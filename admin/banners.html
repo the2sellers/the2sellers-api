@@ -1,53 +1,60 @@
 <!DOCTYPE html>
-  <html lang="en">
-  <head>
-  <meta charset="UTF-8" />
-  <title>Banners | The2Sellers.io Admin</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/admin/style.css">
-  <style>
-    .banner-row{background:#FAFAF7;border:1px solid #E7E3D8;border-radius:8px;padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;gap:16px}
-    .banner-row.inactive{opacity:.5}
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Banners | The2Sellers.io Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/admin/style.css">
+<style>
+  .banner-row{background:#FAFAF7;border:1px solid #E7E3D8;border-radius:8px;padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;gap:16px}
+  .banner-row.inactive{opacity:.5}
+  .banner-thumb{width:56px;height:40px;border-radius:4px;object-fit:cover;background:#EDEAE0;flex:0 0 auto}
+  .banner-thumb.empty{display:flex;align-items:center;justify-content:center;font-size:10px;color:#9A9AA0}
   .banner-order{display:flex;flex-direction:column;gap:2px}
   .banner-order button{background:none;border:1px solid #D8D3C4;border-radius:4px;width:26px;height:22px;cursor:pointer;font-size:11px;line-height:1;color:#5B5D63}
   .banner-order button:hover{background:#F2EFE6}
-      .banner-main{flex:1;min-width:0}
+  .banner-main{flex:1;min-width:0}
   .banner-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#C99721;margin-bottom:2px}
-    .banner-head{font-family:'Fraunces',serif;font-size:17px;color:#0F0F12}
+  .banner-head{font-family:'Fraunces',serif;font-size:17px;color:#0F0F12}
   .banner-sub{font-size:13px;color:#5B5D63;margin-top:2px}
+  .banner-layout-tag{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:#5B5D63;border:1px solid #D8D3C4;border-radius:20px;padding:2px 8px;white-space:nowrap}
   .banner-badge{background:#0F0F12;color:#E8B939;font-size:11px;padding:3px 9px;border-radius:20px;white-space:nowrap}
-    .banner-actions{display:flex;gap:8px}
+  .banner-actions{display:flex;gap:8px}
   .banner-actions button{background:none;border:1px solid #D8D3C4;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px}
   .banner-actions button:hover{background:#F2EFE6}
-      .banner-actions .danger{color:#6B1E23;border-color:#E0C7C9}
-      #bannerForm{display:none}
+  .banner-actions .danger{color:#6B1E23;border-color:#E0C7C9}
+  #bannerForm{display:none}
   #bannerForm.open{display:block}
-      #bannerForm label{display:block;font-size:13px;font-weight:600;margin:14px 0 4px}
-      #bannerForm input{width:100%;padding:9px 11px;border:1px solid #D8D3C4;border-radius:6px;font-size:14px;box-sizing:border-box}
-      #bannerForm .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-      #bannerForm .formActions{margin-top:20px;display:flex;gap:10px}
-      .btn-primary{background:#0F0F12;color:#FAFAF7;border:none;border-radius:6px;padding:10px 18px;cursor:pointer;font-size:14px}
-    .btn-secondary{background:none;border:1px solid #D8D3C4;border-radius:6px;padding:10px 18px;cursor:pointer;font-size:14px}
+  #bannerForm label{display:block;font-size:13px;font-weight:600;margin:14px 0 4px}
+  #bannerForm input[type="text"],#bannerForm select{width:100%;padding:9px 11px;border:1px solid #D8D3C4;border-radius:6px;font-size:14px;box-sizing:border-box;font-family:inherit}
+  #bannerForm .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  #bannerForm .formActions{margin-top:20px;display:flex;gap:10px}
+  #bannerForm .hint{font-size:12px;color:#9A9AA0;margin-top:4px}
+  .btn-primary{background:#0F0F12;color:#FAFAF7;border:none;border-radius:6px;padding:10px 18px;cursor:pointer;font-size:14px}
+  .btn-secondary{background:none;border:1px solid #D8D3C4;border-radius:6px;padding:10px 18px;cursor:pointer;font-size:14px}
   .empty-state{color:#5B5D63;padding:40px 0;text-align:center}
   .toggle-active{cursor:pointer;font-size:12px;color:#5B5D63;white-space:nowrap}
+  #imagePreviewWrap{display:none;margin-top:10px;align-items:center;gap:12px}
+  #imagePreviewWrap img{width:120px;height:70px;object-fit:cover;border-radius:6px;border:1px solid #D8D3C4}
+  #imageUploadRow{display:none}
 </style>
-    </head>
-    <body>
+</head>
+<body>
 <div class="topbar">
   <a href="/admin/index.html" style="font-weight:700;text-decoration:none;color:inherit">The2Sellers.<span style="color:#E8B939">io</span> — Admin</a>
-      <nav>
+  <nav>
     <a href="/admin/index.html">Listings</a>
     <a href="/admin/inquiries.html">Buyer Inquiries</a>
-        <a href="/admin/service-inquiries.html">Service Inquiries</a>
+    <a href="/admin/service-inquiries.html">Service Inquiries</a>
     <a href="/admin/blog.html">Blog</a>
-        <a href="/admin/banners.html" class="active">Banners</a>
+    <a href="/admin/banners.html" class="active">Banners</a>
     <a href="/admin/settings.html">Settings</a>
   </nav>
   <div style="display:flex;align-items:center;gap:14px">
-        <span id="whoami" style="color:#9A9AA0;font-size:13px"></span>
-        <button class="plain button" onclick="logout()">Log out</button>
+    <span id="whoami" style="color:#9A9AA0;font-size:13px"></span>
+    <button class="plain button" onclick="logout()">Log out</button>
   </div>
 </div>
 
@@ -57,155 +64,232 @@
     <button class="btn-primary" onclick="openForm()">+ Add Banner</button>
   </div>
 
-      <p style="color:#5B5D63;font-size:14px;margin-bottom:20px">
+  <p style="color:#5B5D63;font-size:14px;margin-bottom:20px">
     These rotate automatically on the homepage's "What We Actually Do" section. Use the arrows to reorder, the toggle to hide one without deleting it.
   </p>
 
   <div id="bannerForm" class="detail-card">
     <h2 id="formTitle">Add Banner</h2>
     <input type="hidden" id="bannerId" value="" />
+
+    <label>Layout</label>
+    <select id="f_layout" onchange="onLayoutChange()">
+      <option value="text">Text only — no image</option>
+      <option value="background">Background image — photo fills the banner, text overlaid</option>
+      <option value="split">Split image — photo one side, text the other</option>
+    </select>
+
+    <div id="imageUploadRow">
+      <label>Image</label>
+      <input type="file" id="f_image" accept="image/jpeg,image/png,image/webp,image/gif" onchange="onImageSelected(event)" />
+      <div class="hint">JPG, PNG, WEBP, or GIF. Up to 2MB. Any size or shape works — it'll auto-fit the banner.</div>
+      <div id="imagePreviewWrap">
+        <img id="imagePreviewImg" src="" alt="Preview" />
+        <button type="button" class="btn-secondary" onclick="removeImage()">Remove image</button>
+      </div>
+    </div>
+
     <label>Label (small tag shown above the headline)</label>
     <input type="text" id="f_label" placeholder="e.g. Account Management" />
     <label>Headline</label>
     <input type="text" id="f_head" placeholder="e.g. Ownership, not tasks." />
     <label>Subtitle</label>
     <input type="text" id="f_sub" placeholder="e.g. A VA executes. We run the business." />
-        <div class="row2">
-          <div>
+    <div class="row2">
+      <div>
         <label>Badge (optional — leave blank for none, no pricing)</label>
-            <input type="text" id="f_badge" placeholder="e.g. New or Popular" />
-          </div>
-          <div>
-        <label>Link destination</label>
-            <input type="text" id="f_dest" placeholder="e.g. account-management.html" />
-          </div>
-        </div>
-        <div class="formActions">
-          <button class="btn-primary" onclick="saveBanner()">Save Banner</button>
-          <button class="btn-secondary" onclick="closeForm()">Cancel</button>
-    </div>
+        <input type="text" id="f_badge" placeholder="e.g. New or Popular" />
       </div>
-
-      <div id="bannerList"></div>
+      <div>
+        <label>Link destination</label>
+        <input type="text" id="f_dest" placeholder="e.g. account-management.html" />
+      </div>
     </div>
+    <div class="formActions">
+      <button class="btn-primary" onclick="saveBanner()">Save Banner</button>
+      <button class="btn-secondary" onclick="closeForm()">Cancel</button>
+    </div>
+  </div>
 
-    <script>
-    const API = 'https://the2sellers-api.onrender.com';
+  <div id="bannerList"></div>
+</div>
+
+<script>
+const API = 'https://the2sellers-api.onrender.com';
 const token = localStorage.getItem('t2s_admin_token');
 if (!token) { location.href = '/admin/index.html'; }
 
 const whoText = localStorage.getItem('t2s_admin_user');
 if (whoText) {
   try { document.getElementById('whoami').textContent = JSON.parse(whoText).name || ''; } catch(e) {}
-    }
+}
 
 function logout() {
-    localStorage.removeItem('t2s_admin_token');
+  localStorage.removeItem('t2s_admin_token');
   localStorage.removeItem('t2s_admin_user');
   location.href = '/admin/index.html';
 }
 
 let banners = [];
+let selectedImageFile = null;
+let removeImageFlag = false;
+let currentImageData = null;
+
+const LAYOUT_LABELS = { text: 'Text', background: 'Background photo', split: 'Split photo' };
 
 async function loadBanners() {
-    const r = await fetch(API + '/api/admin/banners', { headers: { 'Authorization': 'Bearer ' + token } });
+  const r = await fetch(API + '/api/admin/banners', { headers: { 'Authorization': 'Bearer ' + token } });
   if (!r.ok) { document.getElementById('bannerList').innerHTML = '<div class="empty-state">Could not load banners.</div>'; return; }
   banners = await r.json();
   renderList();
 }
 
 function renderList() {
-    const el = document.getElementById('bannerList');
+  const el = document.getElementById('bannerList');
   if (banners.length === 0) {
     el.innerHTML = '<div class="empty-state">No banners yet. Click "+ Add Banner" to create the first one.</div>';
     return;
   }
   el.innerHTML = banners.map((b, i) => `
-        <div class="banner-row ${b.is_active ? '' : 'inactive'}">
-          <div class="banner-order">
-            <button onclick="move(${b.id}, -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
-            <button onclick="move(${b.id}, 1)" ${i === banners.length - 1 ? 'disabled' : ''}>▼</button>
-          </div>
-          <div class="banner-main">
-            <div class="banner-label">${escapeHtml(b.label)}</div>
-            <div class="banner-head">${escapeHtml(b.head)}</div>
-            ${b.sub ? `<div class="banner-sub">${escapeHtml(b.sub)}</div>` : ''}
-          </div>
-          ${b.badge ? `<div class="banner-badge">${escapeHtml(b.badge)}</div>` : ''}
-          <label class="toggle-active">
-            <input type="checkbox" ${b.is_active ? 'checked' : ''} onchange="toggleActive(${b.id}, this.checked)" />
-            Live
-          </label>
-          <div class="banner-actions">
-            <button onclick="editBanner(${b.id})">Edit</button>
+    <div class="banner-row ${b.is_active ? '' : 'inactive'}">
+      ${b.image_data
+        ? `<img class="banner-thumb" src="${b.image_data}" alt="" />`
+        : `<div class="banner-thumb empty">No image</div>`}
+      <div class="banner-order">
+        <button onclick="move(${b.id}, -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button onclick="move(${b.id}, 1)" ${i === banners.length - 1 ? 'disabled' : ''}>▼</button>
+      </div>
+      <div class="banner-main">
+        <div class="banner-label">${escapeHtml(b.label)}</div>
+        <div class="banner-head">${escapeHtml(b.head)}</div>
+        ${b.sub ? `<div class="banner-sub">${escapeHtml(b.sub)}</div>` : ''}
+      </div>
+      <div class="banner-layout-tag">${LAYOUT_LABELS[b.layout] || 'Text'}</div>
+      ${b.badge ? `<div class="banner-badge">${escapeHtml(b.badge)}</div>` : ''}
+      <label class="toggle-active">
+        <input type="checkbox" ${b.is_active ? 'checked' : ''} onchange="toggleActive(${b.id}, this.checked)" />
+        Live
+      </label>
+      <div class="banner-actions">
+        <button onclick="editBanner(${b.id})">Edit</button>
         <button class="danger" onclick="deleteBanner(${b.id})">Delete</button>
-          </div>
+      </div>
     </div>
   `).join('');
 }
 
 function escapeHtml(str) {
-    if (!str) return '';
-        return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-          }
+  if (!str) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function onLayoutChange() {
+  const layout = document.getElementById('f_layout').value;
+  document.getElementById('imageUploadRow').style.display = (layout === 'text') ? 'none' : 'block';
+}
+
+function onImageSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  selectedImageFile = file;
+  removeImageFlag = false;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('imagePreviewImg').src = e.target.result;
+    document.getElementById('imagePreviewWrap').style.display = 'flex';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeImage() {
+  selectedImageFile = null;
+  removeImageFlag = true;
+  currentImageData = null;
+  document.getElementById('f_image').value = '';
+  document.getElementById('imagePreviewWrap').style.display = 'none';
+}
+
+function resetImageState() {
+  selectedImageFile = null;
+  removeImageFlag = false;
+  currentImageData = null;
+  document.getElementById('f_image').value = '';
+  document.getElementById('imagePreviewWrap').style.display = 'none';
+}
 
 function openForm() {
-    document.getElementById('formTitle').textContent = 'Add Banner';
+  document.getElementById('formTitle').textContent = 'Add Banner';
   document.getElementById('bannerId').value = '';
-      ['f_label','f_head','f_sub','f_badge','f_dest'].forEach(id => document.getElementById(id).value = '');
-          document.getElementById('bannerForm').classList.add('open');
+  ['f_label','f_head','f_sub','f_badge','f_dest'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f_layout').value = 'text';
+  resetImageState();
+  onLayoutChange();
+  document.getElementById('bannerForm').classList.add('open');
   document.getElementById('bannerForm').scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 function closeForm() {
-    document.getElementById('bannerForm').classList.remove('open');
+  document.getElementById('bannerForm').classList.remove('open');
 }
 
 function editBanner(id) {
-    const b = banners.find(x => x.id === id);
+  const b = banners.find(x => x.id === id);
   if (!b) return;
   document.getElementById('formTitle').textContent = 'Edit Banner';
   document.getElementById('bannerId').value = b.id;
   document.getElementById('f_label').value = b.label || '';
-      document.getElementById('f_head').value = b.head || '';
-          document.getElementById('f_sub').value = b.sub || '';
-              document.getElementById('f_badge').value = b.badge || '';
-                  document.getElementById('f_dest').value = b.dest || '';
-                      document.getElementById('bannerForm').classList.add('open');
+  document.getElementById('f_head').value = b.head || '';
+  document.getElementById('f_sub').value = b.sub || '';
+  document.getElementById('f_badge').value = b.badge || '';
+  document.getElementById('f_dest').value = b.dest || '';
+  document.getElementById('f_layout').value = b.layout || 'text';
+  resetImageState();
+  onLayoutChange();
+  if (b.image_data) {
+    currentImageData = b.image_data;
+    document.getElementById('imagePreviewImg').src = b.image_data;
+    document.getElementById('imagePreviewWrap').style.display = 'flex';
+  }
+  document.getElementById('bannerForm').classList.add('open');
   document.getElementById('bannerForm').scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 async function saveBanner() {
   const id = document.getElementById('bannerId').value;
-  const payload = {
-        label: document.getElementById('f_label').value.trim(),
-              head: document.getElementById('f_head').value.trim(),
-              sub: document.getElementById('f_sub').value.trim(),
-              badge: document.getElementById('f_badge').value.trim(),
-              dest: document.getElementById('f_dest').value.trim(),
-          };
-  if (!payload.label || !payload.head) { alert('Label and Headline are required.'); return; }
+  const label = document.getElementById('f_label').value.trim();
+  const head = document.getElementById('f_head').value.trim();
+  if (!label || !head) { alert('Label and Headline are required.'); return; }
+
+  const formData = new FormData();
+  formData.append('label', label);
+  formData.append('head', head);
+  formData.append('sub', document.getElementById('f_sub').value.trim());
+  formData.append('badge', document.getElementById('f_badge').value.trim());
+  formData.append('dest', document.getElementById('f_dest').value.trim());
+  formData.append('layout', document.getElementById('f_layout').value);
+  if (!id) formData.append('display_order', String(banners.length));
+  if (selectedImageFile) formData.append('image', selectedImageFile);
+  if (removeImageFlag) formData.append('remove_image', 'true');
 
   const url = id ? API + '/api/admin/banners/' + id : API + '/api/admin/banners';
   const method = id ? 'PATCH' : 'POST';
-  if (!id) payload.display_order = banners.length;
 
   const r = await fetch(url, {
     method,
-    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-          });
+    headers: { 'Authorization': 'Bearer ' + token },
+    body: formData
+  });
   if (!r.ok) { alert('Save failed.'); return; }
   closeForm();
   await loadBanners();
-                             }
+}
 
 async function deleteBanner(id) {
   if (!confirm('Delete this banner? This cannot be undone.')) return;
   const r = await fetch(API + '/api/admin/banners/' + id, {
     method: 'DELETE',
     headers: { 'Authorization': 'Bearer ' + token }
-});
+  });
   if (!r.ok) { alert('Delete failed.'); return; }
   await loadBanners();
 }
@@ -215,7 +299,7 @@ async function toggleActive(id, isActive) {
     method: 'PATCH',
     headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ is_active: isActive })
-});
+  });
   await loadBanners();
 }
 
@@ -226,21 +310,20 @@ async function move(id, direction) {
   const a = banners[idx], b = banners[swapIdx];
   await Promise.all([
     fetch(API + '/api/admin/banners/' + a.id, {
-          method: 'PATCH',
-                  headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ display_order: b.display_order })
-                    }),
-                        fetch(API + '/api/admin/banners/' + b.id, {
-                          method: 'PATCH',
-                          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ display_order: a.display_order })
-                    })
-                      ]);
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ display_order: b.display_order })
+    }),
+    fetch(API + '/api/admin/banners/' + b.id, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ display_order: a.display_order })
+    })
+  ]);
   await loadBanners();
-  }
+}
 
 loadBanners();
 </script>
-  </body>
-  </html>
-  
+</body>
+</html>
