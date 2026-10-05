@@ -157,7 +157,7 @@ const uploadBannerImage = multer({
 
 app.get('/api/public/banners', ah(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, label, head, sub, badge, dest, layout, image_data FROM banners
+    `SELECT id, label, head, sub, badge, dest, layout, image_data, img_size, img_focus, img_style FROM banners
      WHERE is_active = true ORDER BY display_order ASC, id ASC`
   );
   res.json(rows);
@@ -177,7 +177,7 @@ app.get('/api/admin/banners/:id', requireAuth, ah(async (req, res) => {
 }));
 
 app.post('/api/admin/banners', requireAuth, uploadBannerImage.single('image'), ah(async (req, res) => {
-  const { label, head, sub, badge, dest, layout, display_order, is_active } = req.body;
+  const { label, head, sub, badge, dest, layout, img_size, img_focus, img_style, display_order, is_active } = req.body;
   if (!label || !head) return res.status(400).json({ error: 'label and head are required' });
 
   let image_data = null;
@@ -189,15 +189,15 @@ app.post('/api/admin/banners', requireAuth, uploadBannerImage.single('image'), a
   const display_order_val = (display_order === undefined || display_order === '') ? 0 : parseInt(display_order, 10);
 
   const { rows } = await pool.query(
-    `INSERT INTO banners (label, head, sub, badge, dest, layout, image_data, display_order, is_active)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-    [label, head, sub || null, badge || null, dest || null, layout || 'text', image_data, display_order_val, is_active_val]
+    `INSERT INTO banners (label, head, sub, badge, dest, layout, image_data, img_size, img_focus, img_style, display_order, is_active)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    [label, head, sub || null, badge || null, dest || null, layout || 'text', image_data, ['small', 'medium', 'large'].includes(img_size) ? img_size : 'medium', ['top', 'upper', 'center', 'bottom'].includes(img_focus) ? img_focus : 'upper', ['fade', 'box'].includes(img_style) ? img_style : 'fade', display_order_val, is_active_val]
   );
   res.status(201).json(rows[0]);
 }));
 
 app.patch('/api/admin/banners/:id', requireAuth, uploadBannerImage.single('image'), ah(async (req, res) => {
-  const fields = ['label', 'head', 'sub', 'badge', 'dest', 'layout', 'display_order', 'is_active'];
+  const fields = ['label', 'head', 'sub', 'badge', 'dest', 'layout', 'img_size', 'img_focus', 'img_style', 'display_order', 'is_active'];
   const setClauses = [];
   const params = [];
   fields.forEach((f) => {
