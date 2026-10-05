@@ -267,6 +267,7 @@ async function saveBanner() {
   formData.append('badge', document.getElementById('f_badge').value.trim());
   formData.append('dest', document.getElementById('f_dest').value.trim());
   formData.append('layout', document.getElementById('f_layout').value);
+  formData.append('img_size', document.getElementById('f_size').value); formData.append('img_focus', document.getElementById('f_focus').value); formData.append('img_style', document.getElementById('f_style').value);
   if (!id) formData.append('display_order', String(banners.length));
   if (selectedImageFile) formData.append('image', selectedImageFile);
   if (removeImageFlag) formData.append('remove_image', 'true');
@@ -323,7 +324,7 @@ async function move(id, direction) {
   await loadBanners();
 }
 
-loadBanners();
+(function () { var row = document.getElementById('imageUploadRow'); var box = document.createElement('div'); box.innerHTML = '<div class="row2"><div><label>Photo size</label><select id="f_size"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></div><div><label>Photo focus (part that stays in view)</label><select id="f_focus"><option value="top">Top</option><option value="upper">Upper-middle</option><option value="center">Middle</option><option value="bottom">Bottom</option></select></div></div><label>Photo style (split layout)</label><select id="f_style"><option value="fade">Soft fade into background</option><option value="box">Framed box</option></select><div class="hint">Size and style apply to the Split layout. Focus applies to both photo layouts.</div>'; row.appendChild(box); var oldOpen = openForm; var oldEdit = editBanner; openForm = function () { oldOpen(); document.getElementById('f_size').value = 'medium'; document.getElementById('f_focus').value = 'upper'; document.getElementById('f_style').value = 'fade'; }; editBanner = function (id) { oldEdit(id); var b = banners.find(function (x) { return x.id === id; }); if (b) { document.getElementById('f_size').value = b.img_size || 'medium'; document.getElementById('f_focus').value = b.img_focus || 'upper'; document.getElementById('f_style').value = b.img_style || 'fade'; } }; })();loadBanners();
 </script>
 </body>
 </html>
