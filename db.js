@@ -143,6 +143,9 @@ async function initSchema() {
   // Uploaded image, stored as a base64 data URI so it works reliably without needing
   // separate file storage (Render's own disk doesn't persist across deploys).
   await pool.query(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS image_data TEXT;`);
+  await pool.query(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS img_size TEXT NOT NULL DEFAULT 'medium';`);
+  await pool.query(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS img_focus TEXT NOT NULL DEFAULT 'upper';`);
+  await pool.query(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS img_style TEXT NOT NULL DEFAULT 'fade';`);
 
   // Seed with the existing service cards, once only â never overwrites edits made later.
   const { rows: bannerCountRows } = await pool.query('SELECT COUNT(*)::int AS c FROM banners');
