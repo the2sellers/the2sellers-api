@@ -166,7 +166,10 @@ async function initSchema() {
         `INSERT INTO banners (label, head, sub, badge, dest, display_order) VALUES ($1,$2,$3,$4,$5,$6)`,
         [label, head, sub, badge, dest, i]
       );
-    }  // Events: ticketed seminars and online sessions, with their orders and tickets.
+    }
+  }
+
+  // Events: ticketed seminars and online sessions, with their orders and tickets.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS events (
       id SERIAL PRIMARY KEY,
@@ -231,9 +234,6 @@ async function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_orders_event ON orders(event_id, status);
     CREATE INDEX IF NOT EXISTS idx_tickets_event ON tickets(event_id);
   `);
-
-
-  }
 
   // Single-row table holding site-wide settings (currently just social links).
   await pool.query(`
