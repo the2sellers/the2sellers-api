@@ -599,6 +599,160 @@ app.delete('/api/admin/blog-posts/:id', requireAuth, requireAdmin, ah(async (req
     await pool.query('DELETE FROM blog_posts WHERE id = $1', [req.params.id]);
     res.status(204).send();
 }));
+// ============================================================
+// EVENTS: ticketed seminars and online sessions
+// ============================================================
+
+const EVENT_TEXT_FIELDS = ['city', 'title', 'subline', 'venue', 'address', 'timezone', 'currency', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'banner_caption', 'intro_video_url', 'button_text', 'includes_text', 'starts_at', 'ends_at'];
+const EVENT_INT_FIELDS = ['ticket_price_cents', 'dinner_price_cents', 'dinner_capacity', 'capacity', 'min_attendance', 'refund_cutoff_days', 'banner_overlay'];
+const EVENT_REQUIRED = ['city', 'title', 'timezone', 'currency', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'button_text', 'ticket_price_cents', 'dinner_capacity', 'capacity', 'min_attendance', 'refund_cutoff_days', 'banner_overlay'];
+const EVENT_ENUMS = {
+  status: ['draft', 'published', 'closed', 'cancelled'],
+  banner_type: ['city', 'host'],
+  banner_size: ['small', 'medium', 'large'],
+  banner_focus: ['top', 'upper', 'center', 'bottom'],
+  banner_text_pos: ['left', 'centre']
+};
+
+// Only whitelisted fields ever reach the database. Blank values become NULL
+// unless the column cannot be empty, in which case the old value is kept.
+function cleanEventBody(body) {
+  const out = {};
+  EVENT_TEXT_FIELDS.forEach((f) => {
+    if (body[f] === undefined) return;
+    const v = body[f] === '' ? null : String(body[f]).trim();
+    if (v === null && EVENT_REQUIRED.includes(f)) return;
+    if (v !== null && EVENT_ENUMS[f] && !EVENT_ENUMS[f].includes(v)) return;
+    out[f] = v;
+  });
+  EVENT_INT_FIELDS.forEach((f) => {
+    if (body[f] === undefined) return;
+    if (body[f] === '' || body[f] === null) {
+      if (!EVENT_REQUIRED.includes(f)) out[f] = null;
+      return;
+    }
+    const n = parseInt(body[f], 10);
+    if (Number.isNaN(n) || n < 0) return;
+    out[f] = (f === 'banner_overlay') ? Math.min(n, 90) : n;
+  });
+  if (body.is_online !== undefined) out.is_online = (body.is_online === true || body.is_online === 'true');
+  ['agenda', 'faq'].forEach((f) => {
+    if (body[f] === undefined) return;
+    try {
+      const j = (typeof body[f] === 'string') ? JSON.parse(body[f]) : body[f];
+      if (Array.isArray(j)) out[f] = JSON.stringify(j);
+    } catch (e) { /* ignore malformed JSON */ }
+  });
+  return out;
+}
+
+const EVENT_SALES_SQL = `
+  SELECT e.*,
+    COALESCE((SELECT COUNT(*) FROM tickets t JOIN orders o ON o.id = t.order_id WHERE t.event_id = e.id AND o.status = 'paid'), 0)::int AS seats_sold,
+    COALESCE((SELECT COUNT(*) FROM tickets t JOIN orders o ON o.id = t.order_id WHERE t.event_id = e.id AND o.status = 'paid' AND t.has_dinner), 0)::int AS dinner_sold,
+    COALESCE((SELECT SUM(o.amount_cents) FROM orders o WHERE o.event_id = e.id AND o.status = 'paid'), 0)::int AS revenue_cents
+  FROM events e`;
+
+function publicEvent(r, withImage) {
+  const o = {
+    id: r.id, slug: r.slug, city: r.city, title: r.title, subline: r.subline,
+    venue: r.venue, address: r.address, starts_at: r.starts_at, ends_at: r.ends_at,
+    timezone: r.timezone, currency: r.currency, is_online: r.is_online, status: r.status,
+    ticket_price_cents: r.ticket_price_cents, dinner_price_cents: r.dinner_price_cents,
+    banner_type: r.banner_type, banner_size: r.banner_size, banner_focus: r.banner_focus,
+    banner_overlay: r.banner_overlay, banner_text_pos: r.banner_text_pos,
+    banner_caption: r.banner_caption, intro_video_url: r.intro_video_url,
+    button_text: r.button_text, includes_text: r.includes_text,
+    agenda: r.agenda, faq: r.faq,
+    refund_cutoff_days: r.refund_cutoff_days, min_attendance: r.min_attendance,
+    seats_left: Math.max(0, r.capacity - r.seats_sold),
+    dinner_left: (r.dinner_price_cents !== null && r.dinner_price_cents !== undefined) ? Math.max(0, r.dinner_capacity - r.dinner_sold) : 0
+  };
+  if (withImage) o.banner_image_data = r.banner_image_data;
+  return o;
+}
+
+app.get('/api/public/events', ah(async (req, res) => {
+  const { rows } = await pool.query(EVENT_SALES_SQL + " WHERE e.status = 'published' ORDER BY e.starts_at ASC NULLS LAST");
+  res.json(rows.map((r) => publicEvent(r, false)));
+}));
+
+app.get('/api/public/events/:slug', ah(async (req, res) => {
+  const { rows } = await pool.query(EVENT_SALES_SQL + " WHERE e.slug = $1 AND e.status IN ('published', 'closed')", [req.params.slug]);
+  if (!rows[0]) return res.status(404).json({ error: 'Event not found' });
+  res.json(publicEvent(rows[0], true));
+}));
+
+app.get('/api/admin/events', requireAuth, ah(async (req, res) => {
+  const { rows } = await pool.query(EVENT_SALES_SQL + ' ORDER BY e.starts_at DESC NULLS LAST, e.id DESC');
+  res.json(rows.map((r) => {
+    const o = Object.assign({}, r);
+    o.has_image = !!r.banner_image_data;
+    delete o.banner_image_data;
+    return o;
+  }));
+}));
+
+app.get('/api/admin/events/:id', requireAuth, ah(async (req, res) => {
+  const { rows } = await pool.query(EVENT_SALES_SQL + ' WHERE e.id = $1', [req.params.id]);
+  if (!rows[0]) return res.status(404).json({ error: 'Event not found' });
+  res.json(rows[0]);
+}));
+
+app.post('/api/admin/events', requireAuth, uploadBannerImage.single('image'), ah(async (req, res) => {
+  const d = cleanEventBody(req.body);
+  if (!d.city || !d.title) return res.status(400).json({ error: 'city and title are required' });
+  let slug = slugify(req.body.slug || (d.city + ' ' + d.title)).replace(/^-+|-+$/g, '') || 'event';
+  const { rows: taken } = await pool.query('SELECT 1 FROM events WHERE slug = $1', [slug]);
+  if (taken.length) slug = slug + '-' + Date.now().toString().slice(-5);
+  d.slug = slug;
+  if (req.file) d.banner_image_data = 'data:' + req.file.mimetype + ';base64,' + req.file.buffer.toString('base64');
+  const cols = Object.keys(d);
+  const vals = cols.map((c) => d[c]);
+  const ph = cols.map((c, i) => ((c === 'agenda' || c === 'faq') ? '$' + (i + 1) + '::jsonb' : '$' + (i + 1)));
+  const { rows } = await pool.query('INSERT INTO events (' + cols.join(', ') + ') VALUES (' + ph.join(', ') + ') RETURNING id, slug', vals);
+  res.status(201).json(rows[0]);
+}));
+
+app.patch('/api/admin/events/:id', requireAuth, uploadBannerImage.single('image'), ah(async (req, res) => {
+  const d = cleanEventBody(req.body);
+  if (req.body.slug) {
+    const s = slugify(req.body.slug).replace(/^-+|-+$/g, '');
+    if (s) {
+      const { rows: taken } = await pool.query('SELECT 1 FROM events WHERE slug = $1 AND id <> $2', [s, req.params.id]);
+      if (!taken.length) d.slug = s;
+    }
+  }
+  if (req.file) d.banner_image_data = 'data:' + req.file.mimetype + ';base64,' + req.file.buffer.toString('base64');
+  if (req.body.remove_image === 'true' || req.body.remove_image === true) d.banner_image_data = null;
+  const cols = Object.keys(d);
+  if (cols.length === 0) return res.status(400).json({ error: 'No fields to update' });
+  const sets = cols.map((c, i) => c + ' = ' + ((c === 'agenda' || c === 'faq') ? '$' + (i + 1) + '::jsonb' : '$' + (i + 1)));
+  const vals = cols.map((c) => d[c]);
+  vals.push(req.params.id);
+  const { rows } = await pool.query('UPDATE events SET ' + sets.join(', ') + ', updated_at = NOW() WHERE id = $' + vals.length + ' RETURNING id, slug, status', vals);
+  if (!rows[0]) return res.status(404).json({ error: 'Event not found' });
+  res.json(rows[0]);
+}));
+
+app.delete('/api/admin/events/:id', requireAuth, requireAdmin, ah(async (req, res) => {
+  const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM orders WHERE event_id = $1', [req.params.id]);
+  if (rows[0].n > 0) return res.status(409).json({ error: 'This event has orders. Set it to cancelled instead of deleting it.' });
+  await pool.query('DELETE FROM events WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.get('/api/admin/events/:id/attendees', requireAuth, ah(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT t.id, t.code, t.holder_name, t.has_dinner, t.checked_in_at,
+            o.id AS order_id, o.buyer_name, o.buyer_email, o.amount_cents, o.status, o.created_at
+     FROM tickets t JOIN orders o ON o.id = t.order_id
+     WHERE t.event_id = $1 ORDER BY o.created_at DESC, t.id ASC`,
+    [req.params.id]
+  );
+  res.json(rows);
+}));
+
 
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
