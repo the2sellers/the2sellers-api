@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Event | The2Sellers.io</title>
+<meta name="description" content="A live workshop on selling on Amazon and eBay with Bilal Aftab and The2Sellers.io." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{--ink:#0F0F12;--ink2:#17171B;--paper:#FAFAF7;--gold:#E8B939;--gold-dk:#7A5C0A;--mut:#B9B9BE;--line:#2E2E34;--display:'Fraunces',Georgia,serif;--body:'Inter',-apple-system,Segoe UI,sans-serif}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--body);line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--display);font-weight:400;margin:0;letter-spacing:-.015em}
+p{margin:0}
+a{color:inherit}
+.wrap{max-width:1160px;margin:0 auto;padding:0 40px}
+.sec{padding:96px 0}
+.l{background:var(--paper);color:var(--ink)}
+.m{background:var(--ink2)}
+.eb{font-size:13px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+.l .eb{color:var(--gold-dk)}
+.h2{font-size:clamp(32px,4.2vw,46px);line-height:1.08}
+.mut{color:var(--mut)}
+.l .mut{color:#4A4A52}
+.btn{display:inline-block;background:var(--gold);color:var(--ink);font-family:var(--body);font-weight:600;font-size:17px;padding:18px 32px;border-radius:4px;border:0;text-decoration:none;cursor:pointer;text-align:center}
+.btn:hover{filter:brightness(1.07)}
+.btn[disabled],.btn.off{background:#CFCBBD;color:#55524A;cursor:not-allowed;filter:none}
+.btn2{display:inline-flex;align-items:center;gap:12px;background:none;border:0;color:var(--paper);font-family:var(--body);font-size:16px;cursor:pointer;padding:0}
+.card{border:1px solid var(--line);border-radius:8px;padding:28px;background:#14141A}
+.l .card{border-color:#DDD9CB;background:#fff}
+/* top bar */
+.top{position:sticky;top:0;z-index:40;background:rgba(15,15,18,.92);backdrop-filter:blur(8px);border-bottom:1px solid #26262C}
+.top .wrap{height:68px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.logo{font-family:var(--display);font-size:22px;font-weight:600;text-decoration:none}
+.logo span{color:var(--gold)}
+.pills{display:flex;gap:10px;flex-wrap:wrap}
+.pills a{font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid #33333A;text-decoration:none;color:var(--mut)}
+.pills a.on{background:#26262C;color:var(--paper);border-color:#26262C}
+.top .btn{padding:11px 20px;font-size:14px}
+.pvbar{background:#7A5C0A;color:#fff;text-align:center;font-size:13px;padding:8px}
+/* hero */
+.hero{position:relative;overflow:hidden;background:var(--ink)}
+.hero-city{min-height:clamp(560px,82vh,760px);display:flex;align-items:center;background-size:cover;background-position:center}
+.hero-city .ov{position:absolute;inset:0}
+.hero-in{position:relative;z-index:2;width:100%}
+.hero-text{display:flex;flex-direction:column;gap:24px;max-width:780px}
+.hero.centre .hero-text{margin:0 auto;align-items:center;text-align:center}
+.hero h1{font-size:clamp(40px,6.2vw,80px);line-height:1.02}
+.hero h1 em{font-style:italic;color:var(--gold)}
+.hero .sub{font-size:clamp(17px,1.7vw,21px);color:#E4E4E8;max-width:620px}
+.priceline{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.priceline .p{font-family:var(--display);font-size:clamp(32px,3.6vw,42px)}
+.priceline .n{font-size:15px;color:#D5D5DA}
+.cta-row{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.left-line{font-size:14px;color:var(--gold)}
+.cap{position:absolute;left:40px;bottom:20px;z-index:2;font-size:13px;color:#C9C9CE}
+.play{width:46px;height:46px}
+/* host banner */
+.hero-host{min-height:clamp(560px,80vh,720px);display:flex;align-items:center}
+.hb-media{position:absolute;top:0;right:0;bottom:0;width:46%;background-size:cover;background-position:center 22%;opacity:.92;-webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 58%);mask-image:linear-gradient(90deg,transparent 0%,#000 58%)}
+.hero-host.sz-small .hb-media{width:38%;top:17%;bottom:17%}
+.hero-host.sz-medium .hb-media{width:46%;top:6%;bottom:6%}
+.hero-host.sz-large .hb-media{width:58%;top:0;bottom:0}
+.hero-host.sz-small .hb-media::before,.hero-host.sz-small .hb-media::after,.hero-host.sz-medium .hb-media::before,.hero-host.sz-medium .hb-media::after{content:"";position:absolute;left:0;right:0;height:24%;pointer-events:none}
+.hero-host .hb-media::before{top:0;background:linear-gradient(180deg,#0F0F12 0%,rgba(15,15,18,0) 100%)}
+.hero-host .hb-media::after{bottom:0;background:linear-gradient(0deg,#0F0F12 0%,rgba(15,15,18,0) 100%)}
+.hero-host.sz-large .hb-media::before,.hero-host.sz-large .hb-media::after{display:none}
+.hero-host.f-top .hb-media{background-position:center 0%}
+.hero-host.f-upper .hb-media{background-position:center 22%}
+.hero-host.f-center .hb-media{background-position:center 50%}
+.hero-host.f-bottom .hb-media{background-position:center 100%}
+.hero-host .hero-text{max-width:min(720px,54%)}
+/* proof */
+.stats{border-top:1px solid #26262C;border-bottom:1px solid #26262C}
+.stats .wrap{padding-top:40px;padding-bottom:40px;display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center}
+.stats b{display:block;font-family:var(--display);font-weight:400;font-size:clamp(34px,4.4vw,52px);color:var(--gold);line-height:1}
+.stats span{display:block;color:var(--mut);font-size:12px;letter-spacing:.18em;text-transform:uppercase;margin-top:10px}
+/* for you */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.two h3{font-size:26px;margin-bottom:18px}
+.two .row{display:flex;gap:14px;margin-top:16px}
+.two svg{flex:none;margin-top:3px}
+/* agenda */
+.ag{display:grid;grid-template-columns:.8fr 1.2fr;gap:72px}
+.ag-row{display:grid;grid-template-columns:110px 1fr;gap:24px;padding:24px 0;border-top:1px solid var(--line)}
+.ag-row:last-child{border-bottom:1px solid var(--line)}
+.ag-row .t{color:var(--gold);font-weight:600}
+.ag-row h3{font-size:24px}
+/* host */
+.host{display:grid;grid-template-columns:.85fr 1.15fr;gap:72px;align-items:center}
+.host.solo{grid-template-columns:1fr;max-width:760px}
+.host .portrait{min-height:420px;border-radius:8px;background-size:cover;background-position:center 20%;background-color:#EFEDE4}
+/* tickets */
+.tk{display:grid;grid-template-columns:1fr 440px;gap:72px;align-items:start}
+.tk ul{list-style:none;padding:0;margin:22px 0 0;display:flex;flex-direction:column;gap:12px}
+.tk li{display:flex;gap:12px}
+.tk li svg{flex:none;margin-top:2px}
+.buy{border:2px solid var(--ink);display:flex;flex-direction:column;gap:18px}
+.buy .top{position:static;background:none;border:0;backdrop-filter:none}
+.buy .pr{display:flex;align-items:baseline;justify-content:space-between}
+.buy .pr b{font-family:var(--display);font-weight:400;font-size:44px}
+.stepper{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-top:1px solid #DDD9CB;border-bottom:1px solid #DDD9CB}
+.stepper .ctl{display:flex;align-items:center;gap:18px}
+.stepper button{width:44px;height:44px;border-radius:50%;border:1px solid var(--ink);background:#fff;font-size:20px;cursor:pointer;color:var(--ink)}
+.stepper button:disabled{opacity:.35;cursor:not-allowed}
+.stepper .v{font-size:18px;font-weight:600;min-width:20px;text-align:center}
+.tot{display:flex;justify-content:space-between;font-weight:600;font-size:18px}
+.fine{font-size:13px;color:#4A4A52;text-align:center}
+.left2{font-size:14px;text-align:center;color:var(--gold-dk);font-weight:600}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:600}
+.field input{padding:12px;border:1px solid #CFCBBD;border-radius:6px;font-size:15px;font-family:var(--body)}
+.msg{font-size:13px;color:#A63A2E;text-align:center;min-height:0}
+/* promise */
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.three h3{font-size:24px;margin:14px 0 10px}
+/* faq */
+.faq{max-width:860px}
+.faq details{border-top:1px solid #DDD9CB;padding:22px 0}
+.faq details:last-child{border-bottom:1px solid #DDD9CB}
+.faq summary{font-family:var(--display);font-size:22px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:16px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:'+';font-family:var(--body);color:var(--gold-dk)}
+.faq details[open] summary::after{content:'\2212'}
+.faq details p{margin-top:12px;color:#4A4A52}
+/* final */
+.final{text-align:center;padding:96px 0}
+.final .wrap{display:flex;flex-direction:column;align-items:center;gap:24px}
+.final h2{font-size:clamp(34px,5vw,56px)}
+.foot{border-top:1px solid #26262C;padding:36px 0;font-size:14px;color:var(--mut)}
+.foot .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+/* sticky mobile buy bar */
+.sbar{display:none}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.modal.open{display:flex}
+.modal .box{width:min(960px,100%);aspect-ratio:16/9;background:#000;position:relative}
+.modal iframe{width:100%;height:100%;border:0}
+.modal .x{position:absolute;top:-44px;right:0;background:none;border:0;color:#fff;font-size:15px;cursor:pointer}
+.state{min-height:70vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:40px}
+@media(max-width:900px){
+  .wrap{padding:0 22px}
+  .sec{padding:64px 0}
+  .stats .wrap{grid-template-columns:1fr 1fr}
+  .two,.ag,.host,.tk,.three{grid-template-columns:1fr;gap:28px}
+  .ag-row{grid-template-columns:80px 1fr;gap:16px}
+  .hero-host{display:block;min-height:0}
+  .hero-host .hb-media{position:relative;width:100% !important;height:240px;top:auto !important;bottom:auto !important;-webkit-mask-image:none;mask-image:none;opacity:1}
+  .hero-host .hb-media::before,.hero-host .hb-media::after{display:none !important}
+  .hero-host .hero-text{max-width:none;padding:36px 0 56px}
+  .pills{display:none}
+  .cap{left:22px}
+  .sbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--ink);border-top:1px solid #33333A;padding:12px 18px calc(12px + env(safe-area-inset-bottom));align-items:center;justify-content:space-between;gap:14px}
+  .sbar .sp{font-family:var(--display);font-size:22px;line-height:1.1}
+  .sbar .sl{font-size:12px;color:var(--gold)}
+  .sbar .btn{padding:14px 22px;font-size:16px}
+  .top .btn{display:none}
+  body{padding-bottom:84px}
+}
+</style>
+</head>
+<body>
+<div id="app"><div class="state"><p class="mut">Loading…</p></div></div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Video"><div class="box"><button class="x" onclick="closeVideo()">Close ✕</button><div id="vbox" style="width:100%;height:100%"></div></div></div>
+
+<script>
+// ---------- settings you can change ----------
+var API = 'https://the2sellers-api.onrender.com';
+var CHECKOUT_ENABLED = false;      // becomes true when Stripe checkout is switched on
+var PRICE_NOTE = 'Price in AUD';   // change to 'GST included' once GST is confirmed with your accountant
+var CONTACT_EMAIL = 'contact@the2sellers.io';
+var HOME_URL = 'https://the2sellers.io/';
+
+var qs = new URLSearchParams(location.search);
+var slug = qs.get('e');
+var previewId = qs.get('id');
+var isPreview = qs.get('preview') === '1';
+var ev = null, qty = 1, dq = 0;
+
+function esc(s){ if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function money(c){ var v = c / 100; return 'A$' + (v % 1 === 0 ? v.toLocaleString('en-AU') : v.toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2})); }
+function when(iso, endIso, tz){
+  if (!iso) return 'Date to be announced';
+  try {
+    var d = new Date(iso);
+    var day = new Intl.DateTimeFormat('en-AU', {timeZone:tz, weekday:'long', day:'numeric', month:'long', year:'numeric'}).format(d);
+    var t1 = new Intl.DateTimeFormat('en-AU', {timeZone:tz, hour:'numeric', minute:'2-digit'}).format(d);
+    var out = day + ', ' + t1;
+    if (endIso) { out += ' to ' + new Intl.DateTimeFormat('en-AU', {timeZone:tz, hour:'numeric', minute:'2-digit', timeZoneName:'short'}).format(new Date(endIso)); }
+    return out;
+  } catch (e) { return ''; }
+}
+function shortWhen(iso, tz){ if (!iso) return ''; try { return new Intl.DateTimeFormat('en-AU', {timeZone:tz, day:'numeric', month:'short', year:'numeric'}).format(new Date(iso)); } catch (e) { return ''; } }
+function splitHead(t){
+  var i = t.lastIndexOf('. ');
+  if (i > 0 && i < t.length - 3) return esc(t.slice(0, i + 1)) + ' <em>' + esc(t.slice(i + 2)) + '</em>';
+  return esc(t);
+}
+var CHECK = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F7D4F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>';
+var CROSS = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A63A2E" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+var PLAY = '<svg class="play" viewBox="0 0 64 64" fill="none" stroke="#E8B939" stroke-width="2.5"><circle cx="32" cy="32" r="29"/><path d="M26 20l20 12-20 12z" fill="#E8B939"/></svg>';
+
+// ---------- video ----------
+function videoEmbed(url){
+  if (!url) return null;
+  var m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{6,})/);
+  if (m) return 'https://www.youtube-nocookie.com/embed/' + m[1] + '?autoplay=1&rel=0';
+  m = url.match(/vimeo\.com\/(\d+)/);
+  if (m) return 'https://player.vimeo.com/video/' + m[1] + '?autoplay=1';
+  return null;
+}
+function openVideo(){
+  var src = videoEmbed(ev.intro_video_url);
+  if (!src) { window.open(ev.intro_video_url, '_blank', 'noopener'); return; }
+  document.getElementById('vbox').innerHTML = '<iframe src="' + esc(src) + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="Intro video"></iframe>';
+  document.getElementById('modal').classList.add('open');
+}
+function closeVideo(){ document.getElementById('modal').classList.remove('open'); document.getElementById('vbox').innerHTML = ''; }
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeVideo(); });
+
+// ---------- sale state ----------
+function saleState(){
+  if (ev.status === 'closed') return {open:false, label:'Sales have closed'};
+  if (ev.seats_left <= 0) return {open:false, label:'Sold out'};
+  if (!CHECKOUT_ENABLED) return {open:false, label:'Booking opens soon'};
+  return {open:true, label:ev.button_text || 'Reserve my seat'};
+}
+
+// ---------- render ----------
+function render(others){
+  var s = saleState();
+  var tz = ev.timezone || 'Australia/Adelaide';
+  var cityName = ev.is_online ? 'Online' : ev.city;
+  var wh = when(ev.starts_at, ev.ends_at, tz);
+  var place = ev.is_online ? 'Live online' : [ev.venue, ev.address].filter(Boolean).join(', ');
+  var hasVideo = !!ev.intro_video_url;
+  var ov = (ev.banner_overlay === null || ev.banner_overlay === undefined) ? 60 : ev.banner_overlay;
+  var centre = ev.banner_text_pos === 'centre';
+  var btnText = esc(s.label);
+  var seatsLine = (ev.seats_left > 0 && ev.status !== 'closed') ? '<p class="left-line">' + ev.seats_left + ' seat' + (ev.seats_left === 1 ? '' : 's') + ' left</p>' : '';
+  var cta = '<a class="btn' + (s.open ? '' : ' off') + '" href="#tickets">' + btnText + '</a>';
+  var introBtn = hasVideo ? '<button class="btn2" onclick="openVideo()">' + PLAY + ' Watch the 90-second intro</button>' : '';
+  var textBlock = '<div class="eb">' + esc(cityName) + ' &nbsp;·&nbsp; ' + esc(shortWhen(ev.starts_at, tz) || 'Date to be announced') + (ev.venue && !ev.is_online ? ' &nbsp;·&nbsp; ' + esc(ev.venue) : '') + '</div>' +
+    '<h1>' + splitHead(ev.title) + '</h1>' +
+    (ev.subline ? '<p class="sub">' + esc(ev.subline) + '</p>' : '') +
+    '<div class="priceline"><span class="p">' + money(ev.ticket_price_cents) + '</span><span class="n">per seat &nbsp;·&nbsp; ' + esc(PRICE_NOTE) + ' &nbsp;·&nbsp; no booking fees</span></div>' +
+    '<div class="cta-row">' + cta + introBtn + '</div>' + seatsLine;
+
+  var hero;
+  var img = ev.banner_image_data ? 'url("' + ev.banner_image_data + '")' : '';
+  if (ev.banner_type === 'host') {
+    hero = '<section class="hero hero-host sz-' + esc(ev.banner_size) + ' f-' + esc(ev.banner_focus) + (centre ? ' centre' : '') + '">' +
+      (img ? '<div class="hb-media" style="background-image:' + img.replace(/"/g, '&quot;') + '"></div>' : '') +
+      '<div class="wrap hero-in"><div class="hero-text">' + textBlock + '</div></div></section>';
+  } else {
+    var fpos = {top:'center 0%', upper:'center 22%', center:'center 50%', bottom:'center 100%'}[ev.banner_focus] || 'center 22%';
+    hero = '<section class="hero hero-city' + (centre ? ' centre' : '') + '" style="' + (img ? 'background-image:' + img.replace(/"/g, '&quot;') + ';' : '') + 'background-position:' + fpos + '">' +
+      '<div class="ov" style="background:rgba(15,15,18,' + (ov / 100) + ')"></div>' +
+      '<div class="wrap hero-in"><div class="hero-text">' + textBlock + '</div></div>' +
+      (ev.banner_caption ? '<div class="cap">Photo: ' + esc(ev.banner_caption) + '</div>' : '') + '</section>';
+  }
+
+  var pills = '';
+  if (others && others.length > 1) {
+    pills = '<nav class="pills" aria-label="Other events">' + others.map(function(o){
+      return '<a href="?e=' + encodeURIComponent(o.slug) + '"' + (o.slug === ev.slug ? ' class="on"' : '') + '>' + esc(o.is_online ? 'Online' : o.city) + '</a>';
+    }).join('') + '</nav>';
+  }
+
+  var stats = '<section class="stats m"><div class="wrap"><div><b>10,000+</b><span>Clients served</span></div><div><b>1,800+</b><span>Accounts reinstated</span></div><div><b>50+</b><span>Specialists, UK &amp; PK</span></div><div><b>12</b><span>Marketplaces mastered</span></div></div></section>';
+
+  var foryou = '<section class="sec l"><div class="wrap"><div class="eb">Be honest with yourself</div><h2 class="h2" style="margin:14px 0 44px">Is this for you?</h2><div class="two">' +
+    '<div class="card"><h3>This is for you if</h3>' +
+    '<div class="row">' + CHECK + '<p>You already sell something, on eBay, your own site or in a shop, and want to add Amazon.</p></div>' +
+    '<div class="row">' + CHECK + '<p>You have stock or a product idea and want to know what is realistic before you spend.</p></div>' +
+    '<div class="row">' + CHECK + '<p>You want straight answers on fees, rules and the account risks that catch sellers out.</p></div></div>' +
+    '<div class="card"><h3>This is not for you if</h3>' +
+    '<div class="row">' + CROSS + '<p>You want a promise of income. We do not make one.</p></div>' +
+    '<div class="row">' + CROSS + '<p>You are looking for a get-rich-quick system.</p></div>' +
+    '<div class="row">' + CROSS + '<p>You expect a coaching package to be sold to you in the room. There isn\'t one.</p></div></div>' +
+    '</div></div></section>';
+
+  var agenda = '';
+  var ag = (ev.agenda || []).filter(function(a){ return a && (a.title || a.time || a.text); });
+  if (ag.length) {
+    agenda = '<section class="sec"><div class="wrap ag"><div><div class="eb">The day</div><h2 class="h2" style="margin-top:14px">What happens on the day</h2></div><div>' +
+      ag.map(function(a){ return '<div class="ag-row"><div class="t">' + esc(a.time) + '</div><div><h3>' + esc(a.title) + '</h3>' + (a.text ? '<p class="mut" style="margin-top:8px">' + esc(a.text) + '</p>' : '') + '</div></div>'; }).join('') + '</div></div></section>';
+  }
+
+  var host = '<section class="sec l"><div class="wrap host solo"><div style="display:flex;flex-direction:column;gap:22px"><div class="eb">Your host</div><h2 class="h2">Bilal Aftab</h2>' +
+    '<p style="font-size:19px">Fifteen years inside the marketplace. Ten thousand brands launched, grown, defended and rescued.</p>' +
+    (hasVideo ? '<button class="btn2" style="color:var(--ink)" onclick="openVideo()">' + PLAY + ' Hear it from Bilal</button>' : '') +
+    '</div></div></section>';
+
+  // ticket box
+  var maxQ = Math.max(1, Math.min(10, ev.seats_left || 1));
+  var dinnerOn = (ev.dinner_price_cents !== null && ev.dinner_price_cents !== undefined && ev.dinner_left > 0);
+  var buy = '<div class="card buy" id="buybox"><div class="pr"><b id="pp">' + money(ev.ticket_price_cents) + '</b><span class="fine" style="text-align:right">' + esc(PRICE_NOTE) + '</span></div>' +
+    '<div class="stepper"><span>Seats</span><div class="ctl"><button type="button" id="qm" aria-label="Fewer seats">&minus;</button><span class="v" id="qv">1</span><button type="button" id="qp" aria-label="More seats">+</button></div></div>' +
+    (dinnerOn ? '<div class="stepper" id="drow"><span><strong>Add dinner with Bilal</strong><br><span class="fine" style="text-align:left">' + money(ev.dinner_price_cents) + ' each &nbsp;·&nbsp; ' + ev.dinner_left + ' left</span></span><div class="ctl"><button type="button" id="dm" aria-label="Fewer dinners">&minus;</button><span class="v" id="dv">0</span><button type="button" id="dpl" aria-label="More dinners">+</button></div></div>' : '') +
+    '<div class="tot"><span>Total</span><span id="tt"></span></div>' +
+    (CHECKOUT_ENABLED && s.open ? '<div class="field"><label for="bn">Full name</label><input id="bn" autocomplete="name"></div><div class="field"><label for="be">Email for your ticket</label><input id="be" type="email" autocomplete="email"></div>' : '') +
+    '<button class="btn' + (s.open ? '' : ' off') + '" id="buybtn"' + (s.open ? '' : ' disabled') + '>' + btnText + '</button>' +
+    '<div class="msg" id="msg" role="alert"></div>' +
+    '<p class="fine">Cards, Apple Pay and Google Pay. Payments processed securely by Stripe.</p>' +
+    (ev.seats_left > 0 && ev.status !== 'closed' ? '<p class="left2">' + ev.seats_left + ' seat' + (ev.seats_left === 1 ? '' : 's') + ' left</p>' : '') + '</div>';
+
+  var included = ev.includes_text ? '<p class="mut" style="font-size:18px">' + esc(ev.includes_text) + '</p>' : '';
+  var tickets = '<section class="sec l" id="tickets"><div class="wrap tk"><div><div class="eb">Your seat</div><h2 class="h2" style="margin:14px 0 22px">One ticket. Everything included.</h2>' + included +
+    '<ul><li>' + CHECK + '<span>' + esc(wh) + '</span></li><li>' + CHECK + '<span>' + esc(place || 'Venue to be announced') + '</span></li>' +
+    '<li>' + CHECK + '<span>Your ticket is emailed to you with a QR code</span></li>' +
+    '<li>' + CHECK + '<span>Refund rules stated before you pay</span></li></ul></div>' + buy + '</div></section>';
+
+  var refundTxt = ev.refund_cutoff_days > 0 ? 'Full refund up to ' + ev.refund_cutoff_days + ' day' + (ev.refund_cutoff_days === 1 ? '' : 's') + ' before the event. Stated before you pay.' : 'Our refund rule is stated before you pay.';
+  var promise = '<section class="sec m" style="padding:80px 0"><div class="wrap"><h2 class="h2" style="text-align:center;margin-bottom:48px">Our promise to you</h2><div class="three">' +
+    '<div class="card"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8B939" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><h3>A clear refund rule</h3><p class="mut">' + esc(refundTxt) + '</p></div>' +
+    (ev.min_attendance > 0 ? '<div class="card"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8B939" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 5a3.5 3.5 0 0 1 0 6.5M18 14.4c2.2.7 3.5 2.6 3.5 5.6"/></svg><h3>A minimum-attendance guarantee</h3><p class="mut">If we do not reach ' + ev.min_attendance + ' seats, everyone is refunded automatically.</p></div>' : '') +
+    '<div class="card"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8B939" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg><h3>No upsell on the day</h3><p class="mut">The ticket is the whole price. Nothing is sold in the room.</p></div>' +
+    '</div></div></section>';
+
+  var fq = (ev.faq || []).filter(function(f){ return f && f.q; });
+  var faq = fq.length ? '<section class="sec l"><div class="wrap faq"><h2 class="h2" style="margin-bottom:40px">Questions, answered</h2>' +
+    fq.map(function(f){ return '<details><summary>' + esc(f.q) + '</summary><p>' + esc(f.a) + '</p></details>'; }).join('') + '</div></section>' : '';
+
+  var final = '<section class="final"><div class="wrap"><h2>Your seat is one step away.</h2>' +
+    (ev.seats_left > 0 && ev.status !== 'closed' ? '<p class="mut" style="font-size:19px">' + ev.seats_left + ' seats left for ' + esc(cityName) + '.</p>' : '') +
+    '<a class="btn' + (s.open ? '' : ' off') + '" href="#tickets">' + btnText + '</a></div></section>';
+
+  var foot = '<footer class="foot"><div class="wrap"><span>' + esc(CONTACT_EMAIL) + '</span><span><a href="' + esc(HOME_URL) + '">The2Sellers.io</a></span></div></footer>';
+
+  var sbar = '<div class="sbar"><div><div class="sp">' + money(ev.ticket_price_cents) + '</div>' + (ev.seats_left > 0 && ev.status !== 'closed' ? '<div class="sl">' + ev.seats_left + ' seats left</div>' : '') + '</div><a class="btn' + (s.open ? '' : ' off') + '" href="#tickets">' + btnText + '</a></div>';
+
+  var top = (isPreview ? '<div class="pvbar">Preview. This is how the page looks. Status: ' + esc(ev.status) + '</div>' : '') +
+    '<header class="top"><div class="wrap"><a class="logo" href="' + esc(HOME_URL) + '">The2Sellers<span>.io</span></a>' + pills + '<a class="btn" href="#tickets">' + btnText + '</a></div></header>';
+
+  document.getElementById('app').innerHTML = top + hero + stats + foryou + agenda + host + tickets + promise + faq + final + foot + sbar;
+  document.title = ev.title + ' | ' + cityName + ' | The2Sellers.io';
+  wireBuy(maxQ, dinnerOn, s);
+}
+
+// ---------- ticket box ----------
+function total(){ return ev.ticket_price_cents * qty + (ev.dinner_price_cents || 0) * dq; }
+function refreshTotals(maxQ, dinnerOn){
+  document.getElementById('qv').textContent = qty;
+  document.getElementById('qm').disabled = qty <= 1;
+  document.getElementById('qp').disabled = qty >= maxQ;
+  if (dinnerOn) {
+    var maxD = Math.min(qty, ev.dinner_left);
+    if (dq > maxD) dq = maxD;
+    document.getElementById('dv').textContent = dq;
+    document.getElementById('dm').disabled = dq <= 0;
+    document.getElementById('dpl').disabled = dq >= maxD;
+  }
+  document.getElementById('tt').textContent = money(total()) + ' · ' + PRICE_NOTE.toLowerCase().replace('price in aud', 'AUD');
+}
+function wireBuy(maxQ, dinnerOn, s){
+  refreshTotals(maxQ, dinnerOn);
+  document.getElementById('qm').onclick = function(){ if (qty > 1) { qty--; refreshTotals(maxQ, dinnerOn); } };
+  document.getElementById('qp').onclick = function(){ if (qty < maxQ) { qty++; refreshTotals(maxQ, dinnerOn); } };
+  if (dinnerOn) {
+    document.getElementById('dm').onclick = function(){ if (dq > 0) { dq--; refreshTotals(maxQ, dinnerOn); } };
+    document.getElementById('dpl').onclick = function(){ if (dq < Math.min(qty, ev.dinner_left)) { dq++; refreshTotals(maxQ, dinnerOn); } };
+  }
+  document.getElementById('buybtn').onclick = function(){ if (s.open) checkout(); };
+}
+async function checkout(){
+  var msg = document.getElementById('msg'); msg.textContent = '';
+  var name = (document.getElementById('bn') || {}).value || '', email = (document.getElementById('be') || {}).value || '';
+  if (!name.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) { msg.textContent = 'Please enter your name and a valid email.'; return; }
+  var btn = document.getElementById('buybtn'); btn.disabled = true;
+  try {
+    var r = await fetch(API + '/api/public/events/' + encodeURIComponent(ev.slug) + '/checkout', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ qty: qty, dinner_qty: dq, name: name.trim(), email: email.trim() }) });
+    var d = await r.json();
+    if (!r.ok || !d.url) { msg.textContent = d.error || 'Sorry, we could not start the payment. Please try again.'; btn.disabled = false; return; }
+    location.href = d.url;
+  } catch (e) { msg.textContent = 'Network problem. Please try again.'; btn.disabled = false; }
+}
+
+// ---------- load ----------
+function showState(t){ document.getElementById('app').innerHTML = '<div class="state"><div><h2 class="h2" style="margin-bottom:14px">' + esc(t) + '</h2><p class="mut"><a href="' + esc(HOME_URL) + '">Back to The2Sellers.io</a></p></div></div>'; }
+async function load(){
+  try {
+    if (isPreview && previewId) {
+      var tok = localStorage.getItem('t2s_admin_token');
+      if (!tok) { showState('Please log in to the admin panel to preview.'); return; }
+      var rp = await fetch(API + '/api/admin/events/' + encodeURIComponent(previewId), { headers: {'Authorization': 'Bearer ' + tok} });
+      if (!rp.ok) { showState('Preview not available.'); return; }
+      var e = await rp.json();
+      e.seats_left = Math.max(0, e.capacity - e.seats_sold);
+      e.dinner_left = (e.dinner_price_cents !== null && e.dinner_price_cents !== undefined) ? Math.max(0, e.dinner_capacity - e.dinner_sold) : 0;
+      ev = e;
+      var m = document.createElement('meta'); m.name = 'robots'; m.content = 'noindex'; document.head.appendChild(m);
+      render(null);
+      return;
+    }
+    if (!slug) {
+      var rl = await fetch(API + '/api/public/events'); var list = await rl.json();
+      if (list.length) { location.replace('?e=' + encodeURIComponent(list[0].slug)); return; }
+      showState('No events are on sale right now.'); return;
+    }
+    var r = await fetch(API + '/api/public/events/' + encodeURIComponent(slug));
+    if (r.status === 404) { showState('This event is not available.'); return; }
+    if (!r.ok) { showState('Something went wrong. Please try again.'); return; }
+    ev = await r.json();
+    var others = [];
+    try { others = await (await fetch(API + '/api/public/events')).json(); } catch (e2) {}
+    render(others);
+  } catch (err) { showState('Something went wrong. Please try again.'); }
+}
+load();
+</script>
+</body>
+</html>
