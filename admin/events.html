@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Events | The2Sellers.io Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/admin/style.css">
+<style>
+  .ev-row{background:#FAFAF7;border:1px solid #E7E3D8;border-radius:8px;padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .ev-main{flex:1;min-width:240px}
+  .ev-city{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#C99721;margin-bottom:2px}
+  .ev-title{font-family:'Fraunces',serif;font-size:18px;color:#0F0F12}
+  .ev-meta{font-size:13px;color:#5B5D63;margin-top:3px}
+  .ev-chip{font-size:11px;letter-spacing:.05em;text-transform:uppercase;border-radius:20px;padding:3px 10px;border:1px solid #D8D3C4;color:#5B5D63}
+  .ev-chip.published{background:#E6F2EA;border-color:#B9D9C4;color:#1F6B3F}
+  .ev-chip.draft{background:#F2EFE6}
+  .ev-chip.closed{background:#FFF3D6;border-color:#EAD28F;color:#7A5C0A}
+  .ev-chip.cancelled{background:#F6E3E3;border-color:#E0C7C9;color:#6B1E23}
+  .ev-stat{font-size:13px;color:#0F0F12;text-align:right;min-width:110px}
+  .ev-actions{display:flex;gap:8px}
+  .ev-actions button{background:none;border:1px solid #D8D3C4;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px}
+  .ev-actions button:hover{background:#F2EFE6}
+  #eventForm,#attendeesBox{display:none;margin-bottom:24px}
+  #eventForm.open,#attendeesBox.open{display:block}
+  #eventForm label{display:block;font-size:13px;font-weight:600;margin:14px 0 4px}
+  #eventForm input[type="text"],#eventForm input[type="number"],#eventForm input[type="datetime-local"],#eventForm input[type="url"],#eventForm select,#eventForm textarea{width:100%;padding:9px 11px;border:1px solid #D8D3C4;border-radius:6px;font-size:14px;box-sizing:border-box;font-family:inherit;background:#fff}
+  #eventForm textarea{min-height:70px;resize:vertical}
+  #eventForm .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  #eventForm .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  #eventForm .row4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  #eventForm .hint{font-size:12px;color:#7A7C82;margin-top:4px}
+  #eventForm h3{font-family:'Fraunces',serif;font-size:19px;margin:28px 0 4px;padding-top:18px;border-top:1px solid #E7E3D8}
+  .btn-primary{background:#0F0F12;color:#FAFAF7;border:none;border-radius:6px;padding:10px 18px;cursor:pointer;font-size:14px}
+  .btn-secondary{background:none;border:1px solid #D8D3C4;border-radius:6px;padding:10px 18px;cursor:pointer;font-size:14px}
+  .typecards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .typecards label{display:flex !important;gap:10px;align-items:flex-start;padding:12px;border:1px solid #D8D3C4;border-radius:6px;background:#fff;margin:0 !important;font-weight:500 !important;cursor:pointer}
+  .typecards input{margin-top:3px}
+  .repeat-row{display:grid;gap:10px;margin-bottom:10px;padding:12px;border:1px solid #E7E3D8;border-radius:6px;background:#FAFAF7;position:relative}
+  .repeat-row.agenda{grid-template-columns:110px 1fr}
+  .repeat-row .full{grid-column:1/-1}
+  .repeat-row .rm{position:absolute;top:6px;right:8px;background:none;border:0;color:#6B1E23;cursor:pointer;font-size:13px}
+  #imgPrev{display:none;margin-top:10px;align-items:center;gap:12px}
+  #imgPrev img{width:140px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #D8D3C4}
+  .empty-state{color:#5B5D63;padding:40px 0;text-align:center}
+  table.att{width:100%;border-collapse:collapse;font-size:13px}
+  table.att th,table.att td{text-align:left;padding:8px 10px;border-bottom:1px solid #E7E3D8}
+  table.att th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#7A7C82}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/admin/index.html" style="font-weight:700;text-decoration:none;color:inherit">The2Sellers.<span style="color:#E8B939">io</span> — Admin</a>
+  <nav>
+    <a href="/admin/index.html">Listings</a>
+    <a href="/admin/inquiries.html">Buyer Inquiries</a>
+    <a href="/admin/service-inquiries.html">Service Inquiries</a>
+    <a href="/admin/blog.html">Blog</a>
+    <a href="/admin/banners.html">Banners</a>
+    <a href="/admin/events.html" class="active">Events</a>
+    <a href="/admin/settings.html">Settings</a>
+  </nav>
+  <div style="display:flex;align-items:center;gap:14px">
+    <span id="whoami" style="color:#9A9AA0;font-size:13px"></span>
+    <button class="plain button" onclick="logout()">Log out</button>
+  </div>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Events</h1>
+    <button class="btn-primary" onclick="openForm()">+ New event</button>
+  </div>
+  <p style="color:#5B5D63;font-size:14px;margin-bottom:20px">Seminars and online sessions. Each event gets its own ticket page. Set an event to Published when it is ready for the public.</p>
+
+  <div id="attendeesBox" class="detail-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <h2 id="attTitle" style="margin:0">Attendees</h2>
+      <div style="display:flex;gap:8px"><button class="btn-secondary" onclick="exportCsv()">Download CSV</button><button class="btn-secondary" onclick="closeAttendees()">Close</button></div>
+    </div>
+    <div id="attBody" style="margin-top:14px"></div>
+  </div>
+
+  <div id="eventForm" class="detail-card">
+    <h2 id="formTitle">New event</h2>
+    <input type="hidden" id="eventId" value="" />
+
+    <div class="row2">
+      <div><label>Status</label>
+        <select id="f_status">
+          <option value="draft">Draft (hidden)</option>
+          <option value="published">Published (on sale)</option>
+          <option value="closed">Closed (shown, sales stopped)</option>
+          <option value="cancelled">Cancelled</option>
+        </select></div>
+      <div><label>Page address (optional)</label>
+        <input type="text" id="f_slug" placeholder="adelaide-2026" />
+        <div class="hint">Letters, numbers and dashes. Leave blank to create it automatically.</div></div>
+    </div>
+
+    <h3>What it is</h3>
+    <label>Headline</label>
+    <input type="text" id="f_title" placeholder="Sell on Amazon and eBay. Without the guesswork." />
+    <label>Line under the headline</label>
+    <textarea id="f_subline" placeholder="A live, in-person workshop with Bilal Aftab..."></textarea>
+    <div class="row3">
+      <div><label>City</label><input type="text" id="f_city" placeholder="Adelaide" /></div>
+      <div><label>Venue</label><input type="text" id="f_venue" placeholder="Venue name" /></div>
+      <div><label>Online session?</label><select id="f_online"><option value="false">No, in person</option><option value="true">Yes, online</option></select></div>
+    </div>
+    <label>Address</label>
+    <input type="text" id="f_address" placeholder="Street address and suburb" />
+    <div class="row3">
+      <div><label>Start date and time</label><input type="datetime-local" id="f_starts" /></div>
+      <div><label>End date and time</label><input type="datetime-local" id="f_ends" /></div>
+      <div><label>Time zone</label>
+        <select id="f_tz">
+          <option value="Australia/Adelaide">Adelaide</option>
+          <option value="Australia/Melbourne">Melbourne / Sydney</option>
+          <option value="Australia/Brisbane">Brisbane</option>
+          <option value="Australia/Perth">Perth</option>
+          <option value="Europe/London">London</option>
+          <option value="Asia/Dubai">Dubai</option>
+          <option value="Asia/Karachi">Karachi</option>
+        </select></div>
+    </div>
+
+    <h3>Tickets</h3>
+    <div class="hint">Prices are in Australian dollars and include GST.</div>
+    <div class="row4">
+      <div><label>Ticket price (A$)</label><input type="number" id="f_price" min="0" step="0.01" placeholder="0.00" /></div>
+      <div><label>Total seats</label><input type="number" id="f_capacity" min="0" step="1" placeholder="100" /></div>
+      <div><label>Minimum to run</label><input type="number" id="f_min" min="0" step="1" placeholder="0" /><div class="hint">Everyone is refunded if not reached.</div></div>
+      <div><label>Refund up to (days before)</label><input type="number" id="f_refund" min="0" step="1" placeholder="7" /></div>
+    </div>
+    <div class="row2">
+      <div><label>Dinner add-on price (A$)</label><input type="number" id="f_dprice" min="0" step="0.01" placeholder="Leave blank for no dinner" /></div>
+      <div><label>Dinner seats</label><input type="number" id="f_dcap" min="0" step="1" placeholder="0" /></div>
+    </div>
+    <label>What the ticket includes</label>
+    <textarea id="f_includes" placeholder="The workshop, materials and refreshments."></textarea>
+    <label>Main button text</label>
+    <input type="text" id="f_button" placeholder="Reserve my seat" />
+
+    <h3>Banner</h3>
+    <label>Banner type</label>
+    <div class="typecards">
+      <label><input type="radio" name="bt" id="bt_city" value="city" checked><span><strong>City photo</strong><br><span style="color:#5B5D63;font-size:12px">Full-width photo with the text on top</span></span></label>
+      <label><input type="radio" name="bt" id="bt_host" value="host"><span><strong>Host</strong><br><span style="color:#5B5D63;font-size:12px">Your video or photo beside the text</span></span></label>
+    </div>
+    <label>Photo</label>
+    <input type="file" id="f_image" accept="image/jpeg,image/png,image/webp,image/gif" onchange="onImage(event)" />
+    <div class="hint">JPG, PNG, WEBP or GIF, up to 2MB.</div>
+    <div id="imgPrev"><img id="imgPrevImg" src="" alt="Preview" /><button type="button" class="btn-secondary" onclick="removeImage()">Remove photo</button></div>
+    <div class="row4">
+      <div><label>Photo size</label><select id="f_bsize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></div>
+      <div><label>Photo focus</label><select id="f_bfocus"><option value="top">Top</option><option value="upper">Upper-middle</option><option value="center">Middle</option><option value="bottom">Bottom</option></select></div>
+      <div><label>Text position</label><select id="f_bpos"><option value="left">Left</option><option value="centre">Centre</option></select></div>
+      <div><label>Overlay darkness <span id="ovVal">60</span>%</label><input type="range" id="f_boverlay" min="0" max="90" value="60" oninput="document.getElementById('ovVal').textContent=this.value" /></div>
+    </div>
+    <div class="row2">
+      <div><label>Photo caption</label><input type="text" id="f_bcaption" placeholder="e.g. Our last event, Melbourne" /></div>
+      <div><label>Intro video link</label><input type="url" id="f_video" placeholder="https://" /></div>
+    </div>
+
+    <h3>Agenda</h3>
+    <div class="hint">One row per session on the day.</div>
+    <div id="agendaRows" style="margin-top:10px"></div>
+    <button type="button" class="btn-secondary" onclick="addAgendaRow()">+ Add agenda row</button>
+
+    <h3>Questions and answers</h3>
+    <div id="faqRows" style="margin-top:10px"></div>
+    <button type="button" class="btn-secondary" onclick="addFaqRow()">+ Add question</button>
+
+    <div style="margin-top:28px;display:flex;gap:10px">
+      <button class="btn-primary" id="saveBtn" onclick="saveEvent()">Save event</button>
+      <button class="btn-secondary" onclick="closeForm()">Cancel</button>
+    </div>
+  </div>
+
+  <div id="eventList"></div>
+</div>
+
+<script>
+const API = 'https://the2sellers-api.onrender.com';
+const token = localStorage.getItem('t2s_admin_token');
+if (!token) { location.href = '/admin/index.html'; }
+const whoText = localStorage.getItem('t2s_admin_user');
+if (whoText) { try { document.getElementById('whoami').textContent = JSON.parse(whoText).name || ''; } catch (e) {} }
+function logout() { localStorage.removeItem('t2s_admin_token'); localStorage.removeItem('t2s_admin_user'); location.href = '/admin/index.html'; }
+
+let events = [];
+let selectedImage = null;
+let removeImageFlag = false;
+let attendeeRows = [];
+let attendeeEvent = null;
+
+function $(id) { return document.getElementById(id); }
+function esc(s) { if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function money(cents) { return 'A$' + (Number(cents || 0) / 100).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+// ---- time zone helpers: the form shows local event time, the server stores UTC ----
+function tzOffsetMs(ts, tz) {
+  const dtf = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const p = {};
+  dtf.formatToParts(new Date(ts)).forEach(function (x) { p[x.type] = x.value; });
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - ts;
+}
+function zonedToIso(local, tz) {
+  if (!local) return '';
+  const parts = local.split('T');
+  const d = parts[0].split('-').map(Number);
+  const t = (parts[1] || '00:00').split(':').map(Number);
+  const guess = Date.UTC(d[0], d[1] - 1, d[2], t[0], t[1]);
+  const off = tzOffsetMs(guess, tz);
+  let ts = guess - off;
+  const off2 = tzOffsetMs(ts, tz);
+  if (off2 !== off) ts = guess - off2;
+  return new Date(ts).toISOString();
+}
+function isoToLocalInput(iso, tz) {
+  if (!iso) return '';
+  const dtf = new Intl.DateTimeFormat('en-CA', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const p = {};
+  dtf.formatToParts(new Date(iso)).forEach(function (x) { p[x.type] = x.value; });
+  return p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute;
+}
+function prettyDate(iso, tz) {
+  if (!iso) return 'Date to be set';
+  return new Intl.DateTimeFormat('en-AU', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
+}
+
+async function loadEvents() {
+  const r = await fetch(API + '/api/admin/events', { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!r.ok) { $('eventList').innerHTML = '<div class="empty-state">Could not load events.</div>'; return; }
+  events = await r.json();
+  renderList();
+}
+
+function renderList() {
+  const el = $('eventList');
+  if (!events.length) { el.innerHTML = '<div class="empty-state">No events yet. Click "+ New event" to create the first one.</div>'; return; }
+  el.innerHTML = events.map(function (e) {
+    return '<div class="ev-row">' +
+      '<div class="ev-main"><div class="ev-city">' + esc(e.city) + (e.is_online ? ' · Online' : '') + '</div>' +
+      '<div class="ev-title">' + esc(e.title) + '</div>' +
+      '<div class="ev-meta">' + esc(prettyDate(e.starts_at, e.timezone)) + (e.venue ? ' · ' + esc(e.venue) : '') + ' · page: ' + esc(e.slug) + '</div></div>' +
+      '<span class="ev-chip ' + esc(e.status) + '">' + esc(e.status) + '</span>' +
+      '<div class="ev-stat"><strong>' + e.seats_sold + ' / ' + e.capacity + '</strong> seats<br>' + esc(money(e.revenue_cents)) + ' sold</div>' +
+      '<div class="ev-actions"><button onclick="editEvent(' + e.id + ')">Edit</button><button onclick="showAttendees(' + e.id + ')">Attendees</button></div>' +
+      '</div>';
+  }).join('');
+}
+
+// ---- repeatable rows ----
+function addAgendaRow(d) {
+  d = d || {};
+  const row = document.createElement('div');
+  row.className = 'repeat-row agenda';
+  row.innerHTML = '<input type="text" class="ag-time" placeholder="10:00" /><input type="text" class="ag-title" placeholder="Session title" /><textarea class="ag-text full" placeholder="One line on what you will cover" style="min-height:50px"></textarea><button type="button" class="rm" onclick="this.parentNode.remove()">Remove</button>';
+  row.querySelector('.ag-time').value = d.time || '';
+  row.querySelector('.ag-title').value = d.title || '';
+  row.querySelector('.ag-text').value = d.text || '';
+  $('agendaRows').appendChild(row);
+}
+function addFaqRow(d) {
+  d = d || {};
+  const row = document.createElement('div');
+  row.className = 'repeat-row';
+  row.innerHTML = '<input type="text" class="fq-q" placeholder="Question" /><textarea class="fq-a" placeholder="Answer" style="min-height:50px"></textarea><button type="button" class="rm" onclick="this.parentNode.remove()">Remove</button>';
+  row.querySelector('.fq-q').value = d.q || '';
+  row.querySelector('.fq-a').value = d.a || '';
+  $('faqRows').appendChild(row);
+}
+function collectAgenda() {
+  return Array.prototype.map.call($('agendaRows').children, function (r) {
+    return { time: r.querySelector('.ag-time').value.trim(), title: r.querySelector('.ag-title').value.trim(), text: r.querySelector('.ag-text').value.trim() };
+  }).filter(function (x) { return x.time || x.title || x.text; });
+}
+function collectFaq() {
+  return Array.prototype.map.call($('faqRows').children, function (r) {
+    return { q: r.querySelector('.fq-q').value.trim(), a: r.querySelector('.fq-a').value.trim() };
+  }).filter(function (x) { return x.q || x.a; });
+}
+
+// ---- image ----
+function onImage(ev) {
+  const f = ev.target.files[0];
+  if (!f) return;
+  selectedImage = f; removeImageFlag = false;
+  const rd = new FileReader();
+  rd.onload = function (e) { $('imgPrevImg').src = e.target.result; $('imgPrev').style.display = 'flex'; };
+  rd.readAsDataURL(f);
+}
+function removeImage() { selectedImage = null; removeImageFlag = true; $('f_image').value = ''; $('imgPrev').style.display = 'none'; }
+
+// ---- form ----
+function resetForm() {
+  $('eventId').value = '';
+  ['f_slug','f_title','f_subline','f_city','f_venue','f_address','f_starts','f_ends','f_price','f_capacity','f_min','f_dprice','f_includes','f_bcaption','f_video'].forEach(function (id) { $(id).value = ''; });
+  $('f_status').value = 'draft'; $('f_online').value = 'false'; $('f_tz').value = 'Australia/Adelaide';
+  $('f_refund').value = '7'; $('f_dcap').value = '0'; $('f_button').value = 'Reserve my seat';
+  $('bt_city').checked = true; $('f_bsize').value = 'medium'; $('f_bfocus').value = 'upper'; $('f_bpos').value = 'left';
+  $('f_boverlay').value = 60; $('ovVal').textContent = '60';
+  selectedImage = null; removeImageFlag = false; $('f_image').value = ''; $('imgPrev').style.display = 'none';
+  $('agendaRows').innerHTML = ''; $('faqRows').innerHTML = '';
+}
+function openForm() {
+  resetForm();
+  $('formTitle').textContent = 'New event';
+  addAgendaRow(); addAgendaRow(); addFaqRow();
+  $('eventForm').classList.add('open');
+  $('eventForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function closeForm() { $('eventForm').classList.remove('open'); }
+
+async function editEvent(id) {
+  const r = await fetch(API + '/api/admin/events/' + id, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!r.ok) { alert('Could not load that event.'); return; }
+  const e = await r.json();
+  resetForm();
+  $('formTitle').textContent = 'Edit event';
+  $('eventId').value = e.id;
+  $('f_status').value = e.status; $('f_slug').value = e.slug || '';
+  $('f_title').value = e.title || ''; $('f_subline').value = e.subline || '';
+  $('f_city').value = e.city || ''; $('f_venue').value = e.venue || ''; $('f_address').value = e.address || '';
+  $('f_online').value = e.is_online ? 'true' : 'false';
+  $('f_tz').value = e.timezone || 'Australia/Adelaide';
+  $('f_starts').value = isoToLocalInput(e.starts_at, $('f_tz').value);
+  $('f_ends').value = isoToLocalInput(e.ends_at, $('f_tz').value);
+  $('f_price').value = (e.ticket_price_cents / 100).toFixed(2);
+  $('f_capacity').value = e.capacity; $('f_min').value = e.min_attendance; $('f_refund').value = e.refund_cutoff_days;
+  $('f_dprice').value = (e.dinner_price_cents === null || e.dinner_price_cents === undefined) ? '' : (e.dinner_price_cents / 100).toFixed(2);
+  $('f_dcap').value = e.dinner_capacity;
+  $('f_includes').value = e.includes_text || ''; $('f_button').value = e.button_text || 'Reserve my seat';
+  (e.banner_type === 'host' ? $('bt_host') : $('bt_city')).checked = true;
+  $('f_bsize').value = e.banner_size; $('f_bfocus').value = e.banner_focus; $('f_bpos').value = e.banner_text_pos;
+  $('f_boverlay').value = e.banner_overlay; $('ovVal').textContent = e.banner_overlay;
+  $('f_bcaption').value = e.banner_caption || ''; $('f_video').value = e.intro_video_url || '';
+  if (e.banner_image_data) { $('imgPrevImg').src = e.banner_image_data; $('imgPrev').style.display = 'flex'; }
+  (e.agenda || []).forEach(addAgendaRow); if (!(e.agenda || []).length) addAgendaRow();
+  (e.faq || []).forEach(addFaqRow); if (!(e.faq || []).length) addFaqRow();
+  $('eventForm').classList.add('open');
+  $('eventForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function dollarsToCents(v) {
+  if (v === '' || v === null || v === undefined) return '';
+  const n = parseFloat(v);
+  if (isNaN(n) || n < 0) return '';
+  return String(Math.round(n * 100));
+}
+
+async function saveEvent() {
+  const id = $('eventId').value;
+  const city = $('f_city').value.trim(), title = $('f_title').value.trim();
+  if (!city || !title) { alert('City and headline are required.'); return; }
+  const tz = $('f_tz').value;
+  const fd = new FormData();
+  fd.append('status', $('f_status').value);
+  fd.append('slug', $('f_slug').value.trim());
+  fd.append('title', title); fd.append('subline', $('f_subline').value.trim());
+  fd.append('city', city); fd.append('venue', $('f_venue').value.trim()); fd.append('address', $('f_address').value.trim());
+  fd.append('is_online', $('f_online').value);
+  fd.append('timezone', tz);
+  fd.append('starts_at', zonedToIso($('f_starts').value, tz));
+  fd.append('ends_at', zonedToIso($('f_ends').value, tz));
+  fd.append('ticket_price_cents', dollarsToCents($('f_price').value));
+  fd.append('capacity', $('f_capacity').value); fd.append('min_attendance', $('f_min').value);
+  fd.append('refund_cutoff_days', $('f_refund').value);
+  fd.append('dinner_price_cents', dollarsToCents($('f_dprice').value));
+  fd.append('dinner_capacity', $('f_dcap').value);
+  fd.append('includes_text', $('f_includes').value.trim());
+  fd.append('button_text', $('f_button').value.trim());
+  fd.append('banner_type', $('bt_host').checked ? 'host' : 'city');
+  fd.append('banner_size', $('f_bsize').value); fd.append('banner_focus', $('f_bfocus').value);
+  fd.append('banner_text_pos', $('f_bpos').value); fd.append('banner_overlay', $('f_boverlay').value);
+  fd.append('banner_caption', $('f_bcaption').value.trim()); fd.append('intro_video_url', $('f_video').value.trim());
+  fd.append('agenda', JSON.stringify(collectAgenda()));
+  fd.append('faq', JSON.stringify(collectFaq()));
+  if (selectedImage) fd.append('image', selectedImage);
+  if (removeImageFlag) fd.append('remove_image', 'true');
+  $('saveBtn').disabled = true;
+  try {
+    const r = await fetch(id ? API + '/api/admin/events/' + id : API + '/api/admin/events', { method: id ? 'PATCH' : 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
+    if (!r.ok) { let m = 'Save failed.'; try { m = (await r.json()).error || m; } catch (e) {} alert(m); return; }
+    closeForm();
+    await loadEvents();
+  } finally { $('saveBtn').disabled = false; }
+}
+
+// ---- attendees ----
+async function showAttendees(id) {
+  const ev = events.find(function (x) { return x.id === id; });
+  attendeeEvent = ev;
+  const r = await fetch(API + '/api/admin/events/' + id + '/attendees', { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!r.ok) { alert('Could not load attendees.'); return; }
+  attendeeRows = await r.json();
+  $('attTitle').textContent = 'Attendees: ' + (ev ? ev.city + ' — ' + ev.title : '');
+  if (!attendeeRows.length) {
+    $('attBody').innerHTML = '<div class="empty-state">No tickets sold yet.</div>';
+  } else {
+    $('attBody').innerHTML = '<table class="att"><thead><tr><th>Buyer</th><th>Email</th><th>Ticket</th><th>Dinner</th><th>Order</th><th>Checked in</th></tr></thead><tbody>' +
+      attendeeRows.map(function (a) {
+        return '<tr><td>' + esc(a.holder_name || a.buyer_name) + '</td><td>' + esc(a.buyer_email) + '</td><td>' + esc(a.code) + '</td><td>' + (a.has_dinner ? 'Yes' : '') + '</td><td>' + esc(a.status) + '</td><td>' + (a.checked_in_at ? 'Yes' : '') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  $('attendeesBox').classList.add('open');
+  $('attendeesBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function closeAttendees() { $('attendeesBox').classList.remove('open'); }
+function exportCsv() {
+  const head = ['Buyer', 'Email', 'Ticket code', 'Dinner', 'Order status', 'Checked in', 'Ordered'];
+  const rows = attendeeRows.map(function (a) { return [a.holder_name || a.buyer_name, a.buyer_email, a.code, a.has_dinner ? 'Yes' : 'No', a.status, a.checked_in_at ? 'Yes' : 'No', a.created_at]; });
+  const csv = [head].concat(rows).map(function (r) { return r.map(function (c) { return '"' + String(c === null || c === undefined ? '' : c).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'attendees-' + (attendeeEvent ? attendeeEvent.slug : 'event') + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+loadEvents();
+</script>
+</body>
+</html>
