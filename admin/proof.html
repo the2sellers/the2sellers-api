@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Press &amp; Reviews | The2Sellers.io Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/admin/style.css">
+<style>
+  .card2{background:#fff;border:1px solid #E7E3D8;border-radius:10px;padding:24px;margin-bottom:28px}
+  .card2 h2{font-family:'Fraunces',serif;font-size:22px;margin:0 0 4px}
+  .sub{font-size:13px;color:#5B5D63;margin-bottom:16px}
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 4px}
+  input[type=text],input[type=url],input[type=date],input[type=number],select,textarea{width:100%;padding:9px 11px;border:1px solid #D8D3C4;border-radius:6px;font-size:14px;box-sizing:border-box;font-family:inherit;background:#fff}
+  textarea{min-height:90px;resize:vertical}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .hint{font-size:12px;color:#7A7C82;margin-top:4px}
+  .btn-primary{background:#0F0F12;color:#FAFAF7;border:none;border-radius:6px;padding:10px 18px;cursor:pointer;font-size:14px}
+  .btn-secondary{background:none;border:1px solid #D8D3C4;border-radius:6px;padding:10px 18px;cursor:pointer;font-size:14px}
+  .head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+  .item{display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid #E7E3D8;border-radius:8px;margin-top:10px;background:#FAFAF7;flex-wrap:wrap}
+  .item.off{opacity:.5}
+  .item .main{flex:1;min-width:200px}
+  .item .t{font-weight:600}
+  .item .m{font-size:12px;color:#5B5D63;margin-top:2px;word-break:break-all}
+  .chip{font-size:11px;letter-spacing:.05em;text-transform:uppercase;border:1px solid #D8D3C4;border-radius:20px;padding:3px 10px;color:#5B5D63;white-space:nowrap}
+  .ord button{background:none;border:1px solid #D8D3C4;border-radius:4px;width:26px;height:22px;cursor:pointer;font-size:11px;color:#5B5D63;display:block;margin-bottom:2px}
+  .acts{display:flex;gap:8px}
+  .acts button{background:none;border:1px solid #D8D3C4;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px}
+  .acts .danger{color:#6B1E23;border-color:#E0C7C9}
+  .form{display:none;margin-top:16px;padding:18px;border:1px dashed #C9C4B3;border-radius:8px}
+  .form.open{display:block}
+  .prev{display:none;margin-top:10px;align-items:center;gap:12px}
+  .prev img{max-width:140px;max-height:90px;border-radius:6px;border:1px solid #D8D3C4;object-fit:cover}
+  .empty{color:#5B5D63;padding:18px 0;text-align:center}
+  .ok{color:#1F6B3F;font-size:13px;margin-left:10px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/admin/index.html" style="font-weight:700;text-decoration:none;color:inherit">The2Sellers.<span style="color:#E8B939">io</span> — Admin</a>
+  <nav>
+    <a href="/admin/index.html">Listings</a>
+    <a href="/admin/inquiries.html">Buyer Inquiries</a>
+    <a href="/admin/service-inquiries.html">Service Inquiries</a>
+    <a href="/admin/blog.html">Blog</a>
+    <a href="/admin/banners.html">Banners</a>
+    <a href="/admin/events.html">Events</a>
+    <a href="/admin/proof.html" class="active">Press &amp; Reviews</a>
+    <a href="/admin/settings.html">Settings</a>
+  </nav>
+  <div style="display:flex;align-items:center;gap:14px">
+    <span id="whoami" style="color:#9A9AA0;font-size:13px"></span>
+    <button class="plain button" onclick="logout()">Log out</button>
+  </div>
+</div>
+
+<div class="page">
+  <div class="page-header"><h1>Press, Reviews &amp; Host</h1></div>
+  <p class="sub">What visitors see on your event pages: who you are, where you have been featured, and what sellers say. Everything here appears on every event page.</p>
+
+  <!-- HOST -->
+  <div class="card2">
+    <h2>Your host profile</h2>
+    <div class="sub">The "Your host" section on every event page.</div>
+    <div class="row2">
+      <div><label>Name</label><input type="text" id="h_name" /></div>
+      <div><label>Short line under the name (optional)</label><input type="text" id="h_headline" placeholder="e.g. Founder, The2Sellers.io" /></div>
+    </div>
+    <label>About you</label>
+    <textarea id="h_bio" placeholder="A few sentences, in your own words."></textarea>
+    <label>Portrait photo</label>
+    <input type="file" id="h_image" accept="image/jpeg,image/png,image/webp,image/gif" onchange="pickImage(event,'h')" />
+    <div class="hint">JPG, PNG, WEBP or GIF, up to 2MB. A portrait works best.</div>
+    <div class="prev" id="h_prev"><img id="h_prevImg" alt="" /><button type="button" class="btn-secondary" onclick="dropImage('h')">Remove photo</button></div>
+    <div class="row2">
+      <div><label>Your story video link (optional)</label><input type="url" id="h_video" placeholder="https://www.youtube.com/watch?v=..." /><div class="hint">YouTube or Vimeo links play on the page. Other links open in a new tab.</div></div>
+      <div><label>"As featured in" strip style</label>
+        <select id="h_mode"><option value="auto">Auto (static now, scrolling ticker when there are 7 or more)</option><option value="static">Static row</option><option value="ticker">Scrolling ticker</option></select></div>
+    </div>
+    <div style="margin-top:18px"><button class="btn-primary" id="h_save" onclick="saveHost()">Save host profile</button><span class="ok" id="h_ok"></span></div>
+  </div>
+
+  <!-- PRESS -->
+  <div class="card2">
+    <div class="head"><div><h2>As featured in</h2><div class="sub" style="margin-bottom:0">Podcasts, articles, TV, newspapers and radio. Each links to the real page.</div></div><button class="btn-primary" onclick="openPress()">+ Add press item</button></div>
+    <div class="form" id="pForm">
+      <input type="hidden" id="p_id" />
+      <div class="row3">
+        <div><label>Type</label><select id="p_kind"><option value="podcast">Podcast</option><option value="article">Article</option><option value="profile">Profile</option><option value="tv">TV</option><option value="newspaper">Newspaper</option><option value="radio">Radio</option><option value="other">Other</option></select></div>
+        <div><label>Name shown</label><input type="text" id="p_name" placeholder="e.g. The Sunday Times" /></div>
+        <div><label>Date (optional)</label><input type="date" id="p_date" /></div>
+      </div>
+      <label>Link to the real page or video</label>
+      <input type="url" id="p_url" placeholder="https://" />
+      <label>Logo (optional)</label>
+      <input type="file" id="p_image" accept="image/jpeg,image/png,image/webp,image/gif" onchange="pickImage(event,'p')" />
+      <div class="hint">Only use a logo if you have permission. Without one, the name is shown as text.</div>
+      <div class="prev" id="p_prev"><img id="p_prevImg" alt="" /><button type="button" class="btn-secondary" onclick="dropImage('p')">Remove logo</button></div>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" id="p_active" checked style="width:auto" /> Show on the page</label>
+      <div style="margin-top:14px;display:flex;gap:10px"><button class="btn-primary" onclick="savePress()">Save</button><button class="btn-secondary" onclick="closeForm('pForm')">Cancel</button></div>
+    </div>
+    <div id="pList"></div>
+  </div>
+
+  <!-- REVIEWS -->
+  <div class="card2">
+    <div class="head"><div><h2>Reviews</h2><div class="sub" style="margin-bottom:0">Real reviews only, each linked to where it was posted. Written or video.</div></div><button class="btn-primary" onclick="openReview()">+ Add review</button></div>
+    <div class="form" id="rForm">
+      <input type="hidden" id="r_id" />
+      <div class="row3">
+        <div><label>Type</label><select id="r_kind" onchange="reviewKind()"><option value="text">Written review</option><option value="video">Video review</option></select></div>
+        <div><label>Reviewer name</label><input type="text" id="r_author" /></div>
+        <div><label>Business or role (optional)</label><input type="text" id="r_detail" /></div>
+      </div>
+      <div id="r_textBox"><label>Review text, word for word</label><textarea id="r_body"></textarea></div>
+      <div id="r_videoBox" style="display:none"><label>Video link</label><input type="url" id="r_video" placeholder="https://www.youtube.com/watch?v=..." /></div>
+      <div class="row3">
+        <div><label>Stars (optional, 1 to 5)</label><input type="number" id="r_rating" min="1" max="5" /></div>
+        <div><label>Where it was posted</label><input type="text" id="r_source" placeholder="e.g. Trustpilot, Google" /></div>
+        <div><label>Link to the original</label><input type="url" id="r_surl" placeholder="https://" /></div>
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" id="r_active" checked style="width:auto" /> Show on the page</label>
+      <div style="margin-top:14px;display:flex;gap:10px"><button class="btn-primary" onclick="saveReview()">Save</button><button class="btn-secondary" onclick="closeForm('rForm')">Cancel</button></div>
+    </div>
+    <div id="rList"></div>
+  </div>
+</div>
+
+<script>
+const API = 'https://the2sellers-api.onrender.com';
+const token = localStorage.getItem('t2s_admin_token');
+if (!token) { location.href = '/admin/index.html'; }
+const whoText = localStorage.getItem('t2s_admin_user');
+if (whoText) { try { document.getElementById('whoami').textContent = JSON.parse(whoText).name || ''; } catch (e) {} }
+function logout() { localStorage.removeItem('t2s_admin_token'); localStorage.removeItem('t2s_admin_user'); location.href = '/admin/index.html'; }
+const AUTH = { 'Authorization': 'Bearer ' + token };
+function $(id) { return document.getElementById(id); }
+function esc(s) { if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+async function api(method, path, fd) {
+  const o = { method: method, headers: AUTH };
+  if (fd) o.body = fd;
+  const r = await fetch(API + path, o);
+  let d = null; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) { alert((d && d.error) || 'Something went wrong.'); return null; }
+  return d || {};
+}
+
+// ---- images (host photo = 'h', press logo = 'p') ----
+const picked = { h: null, p: null }, dropped = { h: false, p: false };
+function pickImage(ev, k) {
+  const f = ev.target.files[0]; if (!f) return;
+  picked[k] = f; dropped[k] = false;
+  const rd = new FileReader();
+  rd.onload = function (e) { $(k + '_prevImg').src = e.target.result; $(k + '_prev').style.display = 'flex'; };
+  rd.readAsDataURL(f);
+}
+function dropImage(k) { picked[k] = null; dropped[k] = true; $(k + '_image').value = ''; $(k + '_prev').style.display = 'none'; }
+function resetImage(k) { picked[k] = null; dropped[k] = false; $(k + '_image').value = ''; $(k + '_prev').style.display = 'none'; }
+function closeForm(id) { $(id).classList.remove('open'); }
+
+// ---- host ----
+async function loadHost() {
+  const h = await api('GET', '/api/admin/host'); if (!h) return;
+  $('h_name').value = h.name || ''; $('h_headline').value = h.headline || ''; $('h_bio').value = h.bio || '';
+  $('h_video').value = h.video_url || ''; $('h_mode').value = h.press_mode || 'auto';
+  resetImage('h');
+  if (h.photo_data) { $('h_prevImg').src = h.photo_data; $('h_prev').style.display = 'flex'; }
+}
+async function saveHost() {
+  const fd = new FormData();
+  fd.append('name', $('h_name').value.trim()); fd.append('headline', $('h_headline').value.trim()); fd.append('bio', $('h_bio').value.trim());
+  fd.append('video_url', $('h_video').value.trim()); fd.append('press_mode', $('h_mode').value);
+  if (picked.h) fd.append('image', picked.h);
+  if (dropped.h) fd.append('remove_image', 'true');
+  $('h_save').disabled = true;
+  const r = await api('PATCH', '/api/admin/host', fd);
+  $('h_save').disabled = false;
+  if (r) { $('h_ok').textContent = 'Saved'; setTimeout(function () { $('h_ok').textContent = ''; }, 2500); picked.h = null; dropped.h = false; }
+}
+
+// ---- generic list helpers ----
+async function swap(path, list, id, dir, reload) {
+  const i = list.findIndex(function (x) { return x.id === id; }), j = i + dir;
+  if (j < 0 || j >= list.length) return;
+  const a = list[i], b = list[j];
+  const fa = new FormData(); fa.append('display_order', String(j));
+  const fb = new FormData(); fb.append('display_order', String(i));
+  await Promise.all([api('PATCH', path + '/' + a.id, fa), api('PATCH', path + '/' + b.id, fb)]);
+  reload();
+}
+async function renumber(path, list) {
+  const jobs = [];
+  list.forEach(function (x, i) { if (x.display_order !== i) { const f = new FormData(); f.append('display_order', String(i)); jobs.push(api('PATCH', path + '/' + x.id, f)); } });
+  if (jobs.length) await Promise.all(jobs);
+}
+async function toggle(path, id, on, reload) { const f = new FormData(); f.append('is_active', on ? 'true' : 'false'); await api('PATCH', path + '/' + id, f); reload(); }
+async function remove(path, id, what, reload) { if (!confirm('Delete this ' + what + '? This cannot be undone.')) return; await api('DELETE', path + '/' + id); reload(); }
+
+// ---- press ----
+let press = [];
+const KIND_LABEL = { podcast: 'Podcast', article: 'Article', profile: 'Profile', tv: 'TV', newspaper: 'Newspaper', radio: 'Radio', other: 'Other' };
+async function loadPress() {
+  const d = await api('GET', '/api/admin/press'); if (!d) return;
+  press = d; await renumber('/api/admin/press', press);
+  $('pList').innerHTML = !press.length ? '<div class="empty">Nothing here yet.</div>' : press.map(function (p, i) {
+    return '<div class="item' + (p.is_active ? '' : ' off') + '"><div class="ord"><button ' + (i === 0 ? 'disabled' : '') + ' onclick="swap(\'/api/admin/press\',press,' + p.id + ',-1,loadPress)">▲</button><button ' + (i === press.length - 1 ? 'disabled' : '') + ' onclick="swap(\'/api/admin/press\',press,' + p.id + ',1,loadPress)">▼</button></div>' +
+      '<span class="chip">' + esc(KIND_LABEL[p.kind] || p.kind) + '</span><div class="main"><div class="t">' + esc(p.name) + (p.has_image ? ' · logo' : '') + '</div><div class="m">' + esc(p.url || 'No link') + '</div></div>' +
+      '<label style="margin:0;font-weight:500;font-size:12px;white-space:nowrap"><input type="checkbox" style="width:auto" ' + (p.is_active ? 'checked' : '') + ' onchange="toggle(\'/api/admin/press\',' + p.id + ',this.checked,loadPress)"> Live</label>' +
+      '<div class="acts"><button onclick="editPress(' + p.id + ')">Edit</button><button class="danger" onclick="remove(\'/api/admin/press\',' + p.id + ',\'press item\',loadPress)">Delete</button></div></div>';
+  }).join('');
+}
+function openPress() {
+  $('p_id').value = ''; $('p_kind').value = 'podcast'; $('p_name').value = ''; $('p_date').value = ''; $('p_url').value = ''; $('p_active').checked = true; resetImage('p');
+  $('pForm').classList.add('open'); $('p_name').focus();
+}
+async function editPress(id) {
+  const p = await api('GET', '/api/admin/press/' + id); if (!p) return;
+  openPress();
+  $('p_id').value = p.id; $('p_kind').value = p.kind; $('p_name').value = p.name || ''; $('p_url').value = p.url || '';
+  $('p_date').value = p.item_date ? String(p.item_date).slice(0, 10) : ''; $('p_active').checked = !!p.is_active;
+  if (p.logo_data) { $('p_prevImg').src = p.logo_data; $('p_prev').style.display = 'flex'; }
+}
+async function savePress() {
+  const name = $('p_name').value.trim(); if (!name) { alert('Please enter a name.'); return; }
+  const id = $('p_id').value, fd = new FormData();
+  fd.append('kind', $('p_kind').value); fd.append('name', name); fd.append('url', $('p_url').value.trim()); fd.append('item_date', $('p_date').value);
+  fd.append('is_active', $('p_active').checked ? 'true' : 'false');
+  if (!id) fd.append('display_order', String(press.length));
+  if (picked.p) fd.append('image', picked.p);
+  if (dropped.p) fd.append('remove_image', 'true');
+  const r = await api(id ? 'PATCH' : 'POST', id ? '/api/admin/press/' + id : '/api/admin/press', fd);
+  if (r) { closeForm('pForm'); loadPress(); }
+}
+
+// ---- reviews ----
+let reviews = [];
+async function loadReviews() {
+  const d = await api('GET', '/api/admin/reviews'); if (!d) return;
+  reviews = d; await renumber('/api/admin/reviews', reviews);
+  $('rList').innerHTML = !reviews.length ? '<div class="empty">No reviews yet. Add real ones, each linked to where it was posted.</div>' : reviews.map(function (r, i) {
+    return '<div class="item' + (r.is_active ? '' : ' off') + '"><div class="ord"><button ' + (i === 0 ? 'disabled' : '') + ' onclick="swap(\'/api/admin/reviews\',reviews,' + r.id + ',-1,loadReviews)">▲</button><button ' + (i === reviews.length - 1 ? 'disabled' : '') + ' onclick="swap(\'/api/admin/reviews\',reviews,' + r.id + ',1,loadReviews)">▼</button></div>' +
+      '<span class="chip">' + (r.kind === 'video' ? 'Video' : 'Written') + '</span><div class="main"><div class="t">' + esc(r.author) + (r.detail ? ' · ' + esc(r.detail) : '') + (r.rating ? ' · ' + r.rating + ' stars' : '') + '</div><div class="m">' + esc(r.kind === 'video' ? (r.video_url || '') : (r.body || '').slice(0, 140)) + (r.source ? ' — ' + esc(r.source) : '') + '</div></div>' +
+      '<label style="margin:0;font-weight:500;font-size:12px;white-space:nowrap"><input type="checkbox" style="width:auto" ' + (r.is_active ? 'checked' : '') + ' onchange="toggle(\'/api/admin/reviews\',' + r.id + ',this.checked,loadReviews)"> Live</label>' +
+      '<div class="acts"><button onclick="editReview(' + r.id + ')">Edit</button><button class="danger" onclick="remove(\'/api/admin/reviews\',' + r.id + ',\'review\',loadReviews)">Delete</button></div></div>';
+  }).join('');
+}
+function reviewKind() { const v = $('r_kind').value === 'video'; $('r_videoBox').style.display = v ? 'block' : 'none'; $('r_textBox').style.display = v ? 'none' : 'block'; }
+function openReview() {
+  ['r_id','r_author','r_detail','r_body','r_video','r_rating','r_source','r_surl'].forEach(function (id) { $(id).value = ''; });
+  $('r_kind').value = 'text'; $('r_active').checked = true; reviewKind();
+  $('rForm').classList.add('open'); $('r_author').focus();
+}
+async function editReview(id) {
+  const r = await api('GET', '/api/admin/reviews/' + id); if (!r) return;
+  openReview();
+  $('r_id').value = r.id; $('r_kind').value = r.kind; $('r_author').value = r.author || ''; $('r_detail').value = r.detail || '';
+  $('r_body').value = r.body || ''; $('r_video').value = r.video_url || ''; $('r_rating').value = r.rating || '';
+  $('r_source').value = r.source || ''; $('r_surl').value = r.source_url || ''; $('r_active').checked = !!r.is_active; reviewKind();
+}
+async function saveReview() {
+  const kind = $('r_kind').value, author = $('r_author').value.trim();
+  if (!author) { alert('Please enter the reviewer name.'); return; }
+  if (kind === 'video' && !$('r_video').value.trim()) { alert('Please add the video link.'); return; }
+  if (kind === 'text' && !$('r_body').value.trim()) { alert('Please add the review text.'); return; }
+  const id = $('r_id').value, fd = new FormData();
+  fd.append('kind', kind); fd.append('author', author); fd.append('detail', $('r_detail').value.trim());
+  fd.append('body', kind === 'text' ? $('r_body').value.trim() : ''); fd.append('video_url', kind === 'video' ? $('r_video').value.trim() : '');
+  fd.append('rating', $('r_rating').value); fd.append('source', $('r_source').value.trim()); fd.append('source_url', $('r_surl').value.trim());
+  fd.append('is_active', $('r_active').checked ? 'true' : 'false');
+  if (!id) fd.append('display_order', String(reviews.length));
+  const r = await api(id ? 'PATCH' : 'POST', id ? '/api/admin/reviews/' + id : '/api/admin/reviews', fd);
+  if (r) { closeForm('rForm'); loadReviews(); }
+}
+
+loadHost(); loadPress(); loadReviews();
+</script>
+</body>
+</html>
