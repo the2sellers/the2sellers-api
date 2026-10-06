@@ -599,14 +599,16 @@ app.delete('/api/admin/blog-posts/:id', requireAuth, requireAdmin, ah(async (req
     await pool.query('DELETE FROM blog_posts WHERE id = $1', [req.params.id]);
     res.status(204).send();
 }));
+
 // ============================================================
 // EVENTS: ticketed seminars and online sessions
 // ============================================================
 
-const EVENT_TEXT_FIELDS = ['city', 'title', 'subline', 'venue', 'address', 'timezone', 'currency', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'banner_caption', 'intro_video_url', 'button_text', 'includes_text', 'starts_at', 'ends_at'];
+const EVENT_TEXT_FIELDS = ['city', 'title', 'subline', 'venue', 'address', 'timezone', 'currency', 'price_note', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'banner_caption', 'intro_video_url', 'button_text', 'includes_text', 'starts_at', 'ends_at'];
 const EVENT_INT_FIELDS = ['ticket_price_cents', 'dinner_price_cents', 'dinner_capacity', 'capacity', 'min_attendance', 'refund_cutoff_days', 'banner_overlay'];
 const EVENT_REQUIRED = ['city', 'title', 'timezone', 'currency', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'button_text', 'ticket_price_cents', 'dinner_capacity', 'capacity', 'min_attendance', 'refund_cutoff_days', 'banner_overlay'];
 const EVENT_ENUMS = {
+  currency: ['aud', 'gbp', 'usd', 'eur', 'aed', 'cad', 'nzd', 'sgd', 'pkr', 'inr'],
   status: ['draft', 'published', 'closed', 'cancelled'],
   banner_type: ['city', 'host'],
   banner_size: ['small', 'medium', 'large'],
@@ -657,7 +659,7 @@ function publicEvent(r, withImage) {
   const o = {
     id: r.id, slug: r.slug, city: r.city, title: r.title, subline: r.subline,
     venue: r.venue, address: r.address, starts_at: r.starts_at, ends_at: r.ends_at,
-    timezone: r.timezone, currency: r.currency, is_online: r.is_online, status: r.status,
+    timezone: r.timezone, currency: r.currency, price_note: r.price_note, is_online: r.is_online, status: r.status,
     ticket_price_cents: r.ticket_price_cents, dinner_price_cents: r.dinner_price_cents,
     banner_type: r.banner_type, banner_size: r.banner_size, banner_focus: r.banner_focus,
     banner_overlay: r.banner_overlay, banner_text_pos: r.banner_text_pos,
@@ -753,6 +755,132 @@ app.get('/api/admin/events/:id/attendees', requireAuth, ah(async (req, res) => {
   res.json(rows);
 }));
 
+// ============================================================
+// SOCIAL PROOF: host profile, press strip and reviews
+// ============================================================
+
+const PRESS_KINDS = ['podcast', 'article', 'profile', 'tv', 'newspaper', 'radio', 'other'];
+const REVIEW_KINDS = ['text', 'video'];
+const PRESS_MODES = ['auto', 'static', 'ticker'];
+
+// Whitelisted fields only. Blank values become NULL unless the column cannot be empty.
+function pickFields(body, spec) {
+  const out = {};
+  const req = spec.required || [];
+  (spec.text || []).forEach((f) => {
+    if (body[f] === undefined) return;
+    const v = body[f] === '' ? null : String(body[f]).trim();
+    if (v === null && req.includes(f)) return;
+    if (v !== null && spec.enums && spec.enums[f] && !spec.enums[f].includes(v)) return;
+    if (v !== null && f === 'item_date' && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+    out[f] = v;
+  });
+  (spec.int || []).forEach((f) => {
+    if (body[f] === undefined) return;
+    if (body[f] === '' || body[f] === null) { if (!req.includes(f)) out[f] = null; return; }
+    const n = parseInt(body[f], 10);
+    if (Number.isNaN(n)) return;
+    out[f] = (f === 'rating') ? Math.min(5, Math.max(1, n)) : n;
+  });
+  (spec.bool || []).forEach((f) => {
+    if (body[f] !== undefined) out[f] = (body[f] === true || body[f] === 'true');
+  });
+  return out;
+}
+
+function imageToData(file) {
+  return 'data:' + file.mimetype + ';base64,' + file.buffer.toString('base64');
+}
+
+const PRESS_SPEC = { text: ['kind', 'name', 'url', 'item_date'], int: ['display_order'], bool: ['is_active'], required: ['kind', 'name', 'display_order'], enums: { kind: PRESS_KINDS } };
+const REVIEW_SPEC = { text: ['kind', 'author', 'detail', 'body', 'source', 'source_url', 'video_url'], int: ['rating', 'display_order'], bool: ['is_active'], required: ['kind', 'author', 'display_order'], enums: { kind: REVIEW_KINDS } };
+
+// Admin CRUD for a simple list table (press items, reviews).
+function mountList(base, table, spec, imageCol, validate) {
+  const path = '/api/admin/' + base;
+  app.get(path, requireAuth, ah(async (req, res) => {
+    const { rows } = await pool.query('SELECT * FROM ' + table + ' ORDER BY display_order ASC, id ASC');
+    res.json(rows.map((r) => {
+      const o = Object.assign({}, r);
+      if (imageCol) { o.has_image = !!r[imageCol]; delete o[imageCol]; }
+      return o;
+    }));
+  }));
+  app.get(path + '/:id', requireAuth, ah(async (req, res) => {
+    const { rows } = await pool.query('SELECT * FROM ' + table + ' WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  }));
+  app.post(path, requireAuth, uploadBannerImage.single('image'), ah(async (req, res) => {
+    const d = pickFields(req.body, spec);
+    if (d.display_order === undefined) d.display_order = 0;
+    const problem = validate(d, true);
+    if (problem) return res.status(400).json({ error: problem });
+    if (imageCol && req.file) d[imageCol] = imageToData(req.file);
+    const cols = Object.keys(d);
+    const ph = cols.map((c, i) => '$' + (i + 1));
+    const { rows } = await pool.query('INSERT INTO ' + table + ' (' + cols.join(', ') + ') VALUES (' + ph.join(', ') + ') RETURNING id', cols.map((c) => d[c]));
+    res.status(201).json(rows[0]);
+  }));
+  app.patch(path + '/:id', requireAuth, uploadBannerImage.single('image'), ah(async (req, res) => {
+    const d = pickFields(req.body, spec);
+    if (imageCol && req.file) d[imageCol] = imageToData(req.file);
+    if (imageCol && (req.body.remove_image === 'true' || req.body.remove_image === true)) d[imageCol] = null;
+    const cols = Object.keys(d);
+    if (cols.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    const vals = cols.map((c) => d[c]);
+    vals.push(req.params.id);
+    const { rows } = await pool.query('UPDATE ' + table + ' SET ' + cols.map((c, i) => c + ' = $' + (i + 1)).join(', ') + ' WHERE id = $' + vals.length + ' RETURNING id', vals);
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  }));
+  app.delete(path + '/:id', requireAuth, requireAdmin, ah(async (req, res) => {
+    await pool.query('DELETE FROM ' + table + ' WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  }));
+}
+
+mountList('press', 'press_items', PRESS_SPEC, 'logo_data', function (d) {
+  if (!d.name) return 'A name is required';
+  return null;
+});
+mountList('reviews', 'reviews', REVIEW_SPEC, null, function (d) {
+  if (!d.author) return 'The reviewer name is required';
+  if (d.kind === 'video' && !d.video_url) return 'A video link is required for a video review';
+  if (d.kind !== 'video' && !d.body) return 'The review text is required';
+  return null;
+});
+
+const HOST_SPEC = { text: ['name', 'headline', 'bio', 'video_url', 'press_mode'], enums: { press_mode: PRESS_MODES } };
+
+app.get('/api/admin/host', requireAuth, ah(async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM host_profile WHERE id = 1');
+  res.json(rows[0] || {});
+}));
+
+app.patch('/api/admin/host', requireAuth, uploadBannerImage.single('image'), ah(async (req, res) => {
+  const d = pickFields(req.body, HOST_SPEC);
+  if (req.file) d.photo_data = imageToData(req.file);
+  if (req.body.remove_image === 'true' || req.body.remove_image === true) d.photo_data = null;
+  const cols = Object.keys(d);
+  if (cols.length === 0) return res.status(400).json({ error: 'No fields to update' });
+  const vals = cols.map((c) => d[c]);
+  const { rows } = await pool.query('UPDATE host_profile SET ' + cols.map((c, i) => c + ' = $' + (i + 1)).join(', ') + ', updated_at = NOW() WHERE id = 1 RETURNING id', vals);
+  res.json(rows[0] || { ok: true });
+}));
+
+// One call for the public event pages.
+app.get('/api/public/proof', ah(async (req, res) => {
+  const { rows: h } = await pool.query('SELECT name, headline, bio, photo_data, video_url, press_mode FROM host_profile WHERE id = 1');
+  const { rows: press } = await pool.query('SELECT kind, name, url, logo_data, item_date FROM press_items WHERE is_active = true ORDER BY display_order ASC, id ASC');
+  const { rows: reviews } = await pool.query('SELECT kind, author, detail, body, rating, source, source_url, video_url FROM reviews WHERE is_active = true ORDER BY display_order ASC, id ASC');
+  const host = h[0] || {};
+  res.json({
+    host: { name: host.name || null, headline: host.headline || null, bio: host.bio || null, photo_data: host.photo_data || null, video_url: host.video_url || null },
+    press: { mode: host.press_mode || 'auto', items: press },
+    reviews: reviews
+  });
+}));
 
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
