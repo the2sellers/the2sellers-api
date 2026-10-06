@@ -166,7 +166,73 @@ async function initSchema() {
         `INSERT INTO banners (label, head, sub, badge, dest, display_order) VALUES ($1,$2,$3,$4,$5,$6)`,
         [label, head, sub, badge, dest, i]
       );
-    }
+    }  // Events: ticketed seminars and online sessions, with their orders and tickets.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS events (
+      id SERIAL PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      city TEXT NOT NULL,
+      title TEXT NOT NULL,
+      subline TEXT,
+      venue TEXT,
+      address TEXT,
+      starts_at TIMESTAMPTZ,
+      ends_at TIMESTAMPTZ,
+      timezone TEXT NOT NULL DEFAULT 'Australia/Adelaide',
+      currency TEXT NOT NULL DEFAULT 'aud',
+      ticket_price_cents INTEGER NOT NULL DEFAULT 0,
+      dinner_price_cents INTEGER,
+      dinner_capacity INTEGER NOT NULL DEFAULT 0,
+      capacity INTEGER NOT NULL DEFAULT 0,
+      min_attendance INTEGER NOT NULL DEFAULT 0,
+      refund_cutoff_days INTEGER NOT NULL DEFAULT 7,
+      status TEXT NOT NULL DEFAULT 'draft',
+      is_online BOOLEAN NOT NULL DEFAULT false,
+      banner_type TEXT NOT NULL DEFAULT 'city',
+      banner_image_data TEXT,
+      banner_size TEXT NOT NULL DEFAULT 'medium',
+      banner_focus TEXT NOT NULL DEFAULT 'upper',
+      banner_overlay INTEGER NOT NULL DEFAULT 60,
+      banner_text_pos TEXT NOT NULL DEFAULT 'left',
+      banner_caption TEXT,
+      intro_video_url TEXT,
+      button_text TEXT NOT NULL DEFAULT 'Reserve my seat',
+      includes_text TEXT,
+      agenda JSONB NOT NULL DEFAULT '[]'::jsonb,
+      faq JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS orders (
+      id SERIAL PRIMARY KEY,
+      event_id INTEGER NOT NULL REFERENCES events(id),
+      buyer_name TEXT NOT NULL,
+      buyer_email TEXT NOT NULL,
+      qty INTEGER NOT NULL DEFAULT 1,
+      dinner_qty INTEGER NOT NULL DEFAULT 0,
+      amount_cents INTEGER NOT NULL DEFAULT 0,
+      currency TEXT NOT NULL DEFAULT 'aud',
+      status TEXT NOT NULL DEFAULT 'pending',
+      stripe_session_id TEXT UNIQUE,
+      stripe_payment_intent TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      paid_at TIMESTAMPTZ,
+      refunded_at TIMESTAMPTZ
+    );
+    CREATE TABLE IF NOT EXISTS tickets (
+      id SERIAL PRIMARY KEY,
+      order_id INTEGER NOT NULL REFERENCES orders(id),
+      event_id INTEGER NOT NULL REFERENCES events(id),
+      code TEXT NOT NULL UNIQUE,
+      holder_name TEXT,
+      has_dinner BOOLEAN NOT NULL DEFAULT false,
+      checked_in_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_orders_event ON orders(event_id, status);
+    CREATE INDEX IF NOT EXISTS idx_tickets_event ON tickets(event_id);
+  `);
+
+
   }
 
   // Single-row table holding site-wide settings (currently just social links).
