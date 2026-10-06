@@ -235,6 +235,66 @@ async function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_tickets_event ON tickets(event_id);
   `);
 
+  // Event extras: a per-event price note, plus the host profile, press items and reviews
+  // that the public event pages show as social proof.
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS price_note TEXT;`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS host_profile (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      name TEXT,
+      headline TEXT,
+      bio TEXT,
+      photo_data TEXT,
+      video_url TEXT,
+      press_mode TEXT NOT NULL DEFAULT 'auto',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT host_profile_single_row CHECK (id = 1)
+    );
+    CREATE TABLE IF NOT EXISTS press_items (
+      id SERIAL PRIMARY KEY,
+      kind TEXT NOT NULL DEFAULT 'article',
+      name TEXT NOT NULL,
+      url TEXT,
+      logo_data TEXT,
+      item_date DATE,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS reviews (
+      id SERIAL PRIMARY KEY,
+      kind TEXT NOT NULL DEFAULT 'text',
+      author TEXT NOT NULL,
+      detail TEXT,
+      body TEXT,
+      rating INTEGER,
+      source TEXT,
+      source_url TEXT,
+      video_url TEXT,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(
+    `INSERT INTO host_profile (id, name, bio) VALUES (1, $1, $2) ON CONFLICT (id) DO NOTHING`,
+    ['Bilal Aftab', 'Fifteen years inside the marketplace. Ten thousand brands launched, grown, defended and rescued.']
+  );
+  // Seed the press strip once, from the appearances supplied by the owner.
+  const { rows: pressCountRows } = await pool.query('SELECT COUNT(*)::int AS c FROM press_items');
+  if (pressCountRows[0].c === 0) {
+    const seedPress = [
+      ['podcast', 'Munir Ahmad Podcast', 'https://www.youtube.com/watch?v=UAU7qsIvThg'],
+      ['podcast', 'From Riches to Rags and Back to Riches', 'https://www.youtube.com/watch?v=Wrz8NF8KwiI'],
+      ['profile', 'Connected Pakistan', 'https://people.connectedpakistan.pk/muhammad-bilal-aftab'],
+      ['article', 'Startup Pakistan', 'https://startuppakistan.com.pk/muhammad-bilal-aftab-owns-multiple-7-figure-amazon-brands/'],
+      ['article', 'TechBullion', 'https://techbullion.com/muhammad-bilal-aftab-ceo-of-the-xii-group-among-the-top-amazon-sellers-british-asian-entrepreneurs/']
+    ];
+    for (let i = 0; i < seedPress.length; i++) {
+      await pool.query('INSERT INTO press_items (kind, name, url, display_order) VALUES ($1, $2, $3, $4)', [seedPress[i][0], seedPress[i][1], seedPress[i][2], i]);
+    }
+  }
+
   // Single-row table holding site-wide settings (currently just social links).
   await pool.query(`
     CREATE TABLE IF NOT EXISTS site_settings (
