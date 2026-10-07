@@ -76,6 +76,7 @@
   <p style="color:#5B5D63;font-size:14px;margin-bottom:20px">Seminars and online sessions. Each event gets its own ticket page. Set an event to Published when it is ready for the public.</p>
 
   <div id="emailNotice" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px"></div>
+  <div id="payNotice" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px"></div>
 
   <div id="attendeesBox" class="detail-card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
@@ -472,7 +473,7 @@ function renderBookings() {
         '<td>' + esc(o.phone || '') + (o.phone ? '<div class="hint" style="margin:0">' + (o.whatsapp_ok ? 'OK to message' : 'no WhatsApp consent') + '</div>' : '') + '</td>' +
         '<td>' + o.tickets.length + (dinner ? ' (' + dinner + ' dinner)' : '') + '</td><td>' + esc(amountText(o)) + (o.status !== 'paid' ? ' · ' + esc(o.status) : '') + '</td>' +
         '<td>' + esc(emailText(o.email_status)) + '</td>' +
-        '<td>' + (link ? '<a class="btn-secondary" style="text-decoration:none;display:inline-block;padding:6px 12px;font-size:13px" href="' + esc(link) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + '</td></tr>';
+        '<td>' + (link ? '<a class="btn-secondary" style="text-decoration:none;display:inline-block;padding:6px 12px;font-size:13px" href="' + esc(link) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + (o.status === 'paid' ? ' <button class="btn-secondary" style="padding:6px 12px;font-size:13px" onclick="refundOrder(' + o.id + ',' + (o.amount_cents > 0 ? 'true' : 'false') + ')">' + (o.amount_cents > 0 ? 'Refund' : 'Cancel') + '</button>' : '') + '</td></tr>';
     }).join('') + '</tbody></table>';
 }
 async function showAttendees(id) {
@@ -504,6 +505,40 @@ function exportCsv() {
   document.body.appendChild(a); a.click(); a.remove();
 }
 
+async function refundOrder(id, paid) {
+  if (!confirm(paid ? 'Refund this booking in full? The money goes back to the buyer and their seats are released.' : 'Cancel this free booking? Their seats are released.')) return;
+  const r = await fetch(API + '/api/admin/orders/' + id + '/refund', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+  let d = {}; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) { alert(d.error || 'Could not complete that.'); return; }
+  await showAttendees(bookingData.event.id);
+  loadEvents();
+}
+
+// ---- payments health notice ----
+async function checkPayments() {
+  const el = $('payNotice');
+  try {
+    const r = await fetch(API + '/api/admin/payments-status', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) return;
+    const d = await r.json();
+    let ok = false, text = '';
+    if (!d.key_set) text = 'Online payments are off: the Stripe key has not been added on the server yet. Free events work; paid events show "Booking opens soon".';
+    else if (d.error) text = 'Stripe is connected but answered with an error: ' + d.error;
+    else {
+      const a = d.account || {};
+      const mode = d.mode === 'live' ? 'LIVE (real money)' : 'TEST (no real money)';
+      text = 'Payments: Stripe ' + mode + ' connected to ' + (a.name || 'your account') + (a.country ? ' (' + a.country + ')' : '') + (a.charges_enabled ? '' : '. Charges are not enabled on this account') + '.';
+      if (!d.webhook_secret_set) text += ' The webhook secret is not set yet, so payments are confirmed when the buyer returns to the ticket page.';
+      ok = a.charges_enabled && d.webhook_secret_set;
+    }
+    el.style.display = 'block';
+    el.style.background = ok ? '#E6F2EA' : '#FFF3D6';
+    el.style.border = '1px solid ' + (ok ? '#B9D9C4' : '#EAD28F');
+    el.style.color = ok ? '#1F6B3F' : '#7A5C0A';
+    el.textContent = text;
+  } catch (e) {}
+}
+
 // ---- customer email health notice ----
 async function checkEmail() {
   const el = $('emailNotice');
@@ -527,6 +562,7 @@ async function checkEmail() {
 
 loadEvents();
 checkEmail();
+checkPayments();
 </script>
 </body>
 </html>
