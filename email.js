@@ -4,12 +4,15 @@
 // misconfigured key never blocks a real submission or booking from saving.
 //
 // NOTIFY_EMAIL: where owner notifications go (defaults to contact@the2sellers.io).
-// RESEND_FROM:  the sender address. To email customers (tickets, receipts) this must be
-//               an address on a domain you have verified in Resend, e.g.
-//               "The2Sellers.io <tickets@the2sellers.io>".
+// RESEND_FROM:  sender for owner notifications (unchanged; works with Resend's shared sender).
+// TICKET_FROM:  sender for emails to customers (tickets). This must be an address on a domain
+//               verified in Resend. Defaults to "The2Sellers.io <tickets@the2sellers.io>", so
+//               ticket emails start working as soon as the2sellers.io is verified in Resend.
 
 const NOTIFY_TO = process.env.NOTIFY_EMAIL || 'contact@the2sellers.io';
 const FROM_ADDRESS = process.env.RESEND_FROM || 'The2Sellers.io <onboarding@resend.dev>';
+const TICKET_FROM = process.env.TICKET_FROM || 'The2Sellers.io <tickets@the2sellers.io>';
+const REPLY_TO = process.env.REPLY_TO_EMAIL || 'contact@the2sellers.io';
 
 async function postToResend(payload) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -63,13 +66,13 @@ async function sendMail(opts) {
   }
   try {
     const payload = {
-      from: FROM_ADDRESS,
+      from: TICKET_FROM,
       to: [opts.to],
       subject: opts.subject,
       html: opts.html,
-      text: opts.text
+      text: opts.text,
+      reply_to: opts.replyTo || REPLY_TO
     };
-    if (opts.replyTo) payload.reply_to = opts.replyTo;
     return await postToResend(payload);
   } catch (err) {
     console.error('Email send threw an error:', err.message);
@@ -77,4 +80,4 @@ async function sendMail(opts) {
   }
 }
 
-module.exports = { sendNotification, sendMail };
+module.exports = { sendNotification, sendMail, TICKET_FROM, NOTIFY_TO, FROM_ADDRESS };
