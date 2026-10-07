@@ -493,6 +493,7 @@ async function load(){
       e.seats_left = Math.max(0, e.capacity - e.seats_sold);
       e.dinner_left = (e.dinner_price_cents !== null && e.dinner_price_cents !== undefined) ? Math.max(0, e.dinner_capacity - e.dinner_sold) : 0;
       ev = e;
+      try { var cfgP = await (await fetch(API + '/api/public/config')).json(); CHECKOUT_ENABLED = !!cfgP.payments; } catch (e6) {}
       var m = document.createElement('meta'); m.name = 'robots'; m.content = 'noindex'; document.head.appendChild(m);
       var proofP = {}; try { proofP = await (await fetch(API + '/api/public/proof')).json(); } catch (e3) {}
       render(null, proofP);
@@ -507,10 +508,12 @@ async function load(){
     if (r.status === 404) { showState('This event is not available.'); return; }
     if (!r.ok) { showState('Something went wrong. Please try again.'); return; }
     ev = await r.json();
+    try { var cfg = await (await fetch(API + '/api/public/config')).json(); CHECKOUT_ENABLED = !!cfg.payments; } catch (e5) {}
     var others = [];
     try { others = await (await fetch(API + '/api/public/events')).json(); } catch (e2) {}
     var proof = {}; try { proof = await (await fetch(API + '/api/public/proof')).json(); } catch (e4) {}
     render(others, proof);
+    if (qs.get('cancelled') === '1') { var cn = document.createElement('div'); cn.className = 'pvbar'; cn.style.background = '#17171B'; cn.textContent = 'Payment cancelled. Your seats were released. You can book again below.'; var appEl = document.getElementById('app'); appEl.insertBefore(cn, appEl.firstChild); }
   } catch (err) { showState('Something went wrong. Please try again.'); }
 }
 load();
