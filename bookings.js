@@ -61,6 +61,7 @@ function ensureSchema(pool) {
       await pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS buyer_phone TEXT');
       await pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS whatsapp_ok BOOLEAN NOT NULL DEFAULT false');
       await pool.query('ALTER TABLE host_profile ADD COLUMN IF NOT EXISTS whatsapp_template TEXT');
+      await pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS hold_expires_at TIMESTAMPTZ');
     })().catch(function (e) { schemaReady = null; throw e; });
   }
   return schemaReady;
@@ -97,6 +98,21 @@ function buildEmail(ev, name, token, codes) {
   const text = 'You are booked in, ' + name + '.\n\n' + ev.title + '\n' + whenText(ev) + '\n' + placeText(ev) + '\n\nYour tickets: ' + link + '\n\n' +
     codes.map(function (c) { return 'Ticket ' + c.code + (c.has_dinner ? ' (includes dinner)' : ''); }).join('\n') + '\n';
   return { html: html, text: text };
+}
+
+// Emails the customer their tickets and notifies the owner. Used by free and paid bookings.
+async function afterBooking(pool, ev, name, email, token, codes, orderId, paidText) {
+  let status = 'skipped';
+  try {
+    const m = buildEmail(ev, name, token, codes);
+    const r = await sendMail({ to: email, subject: 'Your ticket: ' + ev.title, html: m.html, text: m.text });
+    status = r.ok ? 'sent' : (r.skipped ? 'skipped' : 'failed:' + (r.status || r.error || 'unknown'));
+  } catch (e) { status = 'failed'; }
+  try { await pool.query('UPDATE orders SET email_status = $1 WHERE id = $2', [status, orderId]); } catch (e) { /* ignore */ }
+  try {
+    await sendNotification('New booking: ' + ev.city + ' (' + codes.length + ' seat' + (codes.length === 1 ? '' : 's') + ')',
+      name + ' <' + email + '> booked ' + codes.length + ' seat(s) for ' + ev.title + ' (' + ev.city + ').' + (paidText ? '\nPaid: ' + paidText : '') + '\nTicket email: ' + status + '\n');
+  } catch (e) { /* ignore */ }
 }
 
 module.exports = function mountBookings(app, pool) {
@@ -137,7 +153,8 @@ module.exports = function mountBookings(app, pool) {
       if (total > 0) { await client.query('ROLLBACK'); return res.status(402).json({ error: 'This booking needs a payment. Online payment opens soon.' }); }
 
       const sold = (await client.query(
-        "SELECT COUNT(*)::int AS n, (COUNT(*) FILTER (WHERE t.has_dinner))::int AS d FROM tickets t JOIN orders o ON o.id = t.order_id WHERE t.event_id = $1 AND o.status = 'paid'", [ev.id])).rows[0];
+        "SELECT (SELECT COUNT(*)::int FROM tickets t JOIN orders o ON o.id = t.order_id WHERE t.event_id = $1 AND o.status = 'paid') + COALESCE((SELECT SUM(qty) FROM orders WHERE event_id = $1 AND status = 'pending' AND hold_expires_at > NOW()), 0)::int AS n, " +
+        "(SELECT COUNT(*)::int FROM tickets t JOIN orders o ON o.id = t.order_id WHERE t.event_id = $1 AND o.status = 'paid' AND t.has_dinner) + COALESCE((SELECT SUM(dinner_qty) FROM orders WHERE event_id = $1 AND status = 'pending' AND hold_expires_at > NOW()), 0)::int AS d", [ev.id])).rows[0];
       const left = Math.max(0, ev.capacity - sold.n);
       if (qty > left) {
         await client.query('ROLLBACK');
@@ -176,19 +193,7 @@ module.exports = function mountBookings(app, pool) {
     res.status(201).json({ ok: true, token: token, tickets: codes.length });
 
     // After responding: email the customer (a copy of the ticket page) and notify the owner.
-    (async function () {
-      let status = 'skipped';
-      try {
-        const m = buildEmail(ev, name, token, codes);
-        const r = await sendMail({ to: email, subject: 'Your ticket: ' + ev.title, html: m.html, text: m.text });
-        status = r.ok ? 'sent' : (r.skipped ? 'skipped' : 'failed:' + (r.status || r.error || 'unknown'));
-      } catch (e) { status = 'failed'; }
-      try { await pool.query('UPDATE orders SET email_status = $1 WHERE id = $2', [status, orderId]); } catch (e) { /* ignore */ }
-      try {
-        await sendNotification('New booking: ' + ev.city + ' (' + codes.length + ' seat' + (codes.length === 1 ? '' : 's') + ')',
-          name + ' <' + email + '> booked ' + codes.length + ' seat(s) for ' + ev.title + ' (' + ev.city + ').\nTicket email: ' + status + '\n');
-      } catch (e) { /* ignore */ }
-    })();
+    afterBooking(pool, ev, name, email, token, codes, orderId, '').catch(function () { /* ignore */ });
   }));
 
   // The customer's ticket page reads this. The long random token is the only key.
@@ -273,4 +278,7 @@ module.exports = function mountBookings(app, pool) {
     res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
     res.send(qrPng(req.params.code, 8, 4));
   });
+
+  // Stripe checkout, webhook, confirmation and refunds
+  require('./payments')(app, pool, { ensureSchema: ensureSchema, newCode: newCode, afterBooking: afterBooking, limited: limited, cleanPhone: cleanPhone, ah: ah, TICKET_PAGE_URL: TICKET_PAGE_URL, MAX_PER_ORDER: MAX_PER_ORDER, MAX_PER_EMAIL: MAX_PER_EMAIL });
 };
