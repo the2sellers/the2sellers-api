@@ -14,6 +14,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use('/admin', express.static(require('path').join(__dirname, 'admin')));
+require('./bookings')(app, pool);
 
 const PORT = process.env.PORT || 4000;
 
