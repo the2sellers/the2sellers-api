@@ -1,19 +1,40 @@
-// Sends a notification email via Resend (resend.com — free tier, no card required).
-// If RESEND_API_KEY isn't set, this quietly no-ops and logs to the console instead —
+// Sends email via Resend (resend.com).
+// If RESEND_API_KEY isn't set, this quietly no-ops and logs to the console instead,
 // so local development and testing never require real email credentials, and a
-// misconfigured key never blocks a real submission from saving.
+// misconfigured key never blocks a real submission or booking from saving.
+//
+// NOTIFY_EMAIL: where owner notifications go (defaults to contact@the2sellers.io).
+// RESEND_FROM:  the sender address. To email customers (tickets, receipts) this must be
+//               an address on a domain you have verified in Resend, e.g.
+//               "The2Sellers.io <tickets@the2sellers.io>".
 
 const NOTIFY_TO = process.env.NOTIFY_EMAIL || 'contact@the2sellers.io';
 const FROM_ADDRESS = process.env.RESEND_FROM || 'The2Sellers.io <onboarding@resend.dev>';
 
-async function sendNotification(subject, textBody, attachments) {
+async function postToResend(payload) {
   const apiKey = process.env.RESEND_API_KEY;
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + apiKey,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error('Email send failed:', res.status, errBody);
+    return { ok: false, status: res.status };
+  }
+  return { ok: true };
+}
 
-  if (!apiKey) {
+// Owner notification (plain text, optional attachments). Unchanged behaviour.
+async function sendNotification(subject, textBody, attachments) {
+  if (!process.env.RESEND_API_KEY) {
     console.log('[email skipped — no RESEND_API_KEY set] Subject:', subject);
     return { skipped: true };
   }
-
   try {
     const payload = {
       from: FROM_ADDRESS,
@@ -26,22 +47,7 @@ async function sendNotification(subject, textBody, attachments) {
         return { filename: a.filename, content: a.content };
       });
     }
-
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + apiKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      console.error('Email send failed:', res.status, errBody);
-      return { ok: false, status: res.status };
-    }
-    return { ok: true };
+    return await postToResend(payload);
   } catch (err) {
     // Never let an email failure break the actual submission — just log it.
     console.error('Email send threw an error:', err.message);
@@ -49,4 +55,26 @@ async function sendNotification(subject, textBody, attachments) {
   }
 }
 
-module.exports = { sendNotification };
+// Email to a customer (HTML plus a plain-text copy).
+async function sendMail(opts) {
+  if (!process.env.RESEND_API_KEY) {
+    console.log('[email skipped — no RESEND_API_KEY set] To:', opts.to, 'Subject:', opts.subject);
+    return { skipped: true };
+  }
+  try {
+    const payload = {
+      from: FROM_ADDRESS,
+      to: [opts.to],
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text
+    };
+    if (opts.replyTo) payload.reply_to = opts.replyTo;
+    return await postToResend(payload);
+  } catch (err) {
+    console.error('Email send threw an error:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+module.exports = { sendNotification, sendMail };
