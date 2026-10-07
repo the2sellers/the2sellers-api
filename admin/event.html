@@ -197,6 +197,7 @@ a.pi:hover .pn{color:var(--gold)}
 <script>
 // ---------- settings you can change ----------
 var API = 'https://the2sellers-api.onrender.com';
+var FREE_ENABLED = true;           // free bookings (no payment) are open
 var CHECKOUT_ENABLED = false;      // becomes true when Stripe checkout is switched on
 var CONTACT_EMAIL = 'contact@the2sellers.io';
 var HOME_URL = 'https://the2sellers.io/';
@@ -266,7 +267,7 @@ document.addEventListener('click', function(e){ var b = e.target.closest ? e.tar
 function saleState(){
   if (ev.status === 'closed') return {open:false, label:'Sales have closed'};
   if (ev.seats_left <= 0) return {open:false, label:'Sold out'};
-  if (!CHECKOUT_ENABLED) return {open:false, label:'Booking opens soon'};
+  if (!ev.ticket_price_cents ? !FREE_ENABLED : !CHECKOUT_ENABLED) return {open:false, label:'Booking opens soon'};
   return {open:true, label:(!ev.ticket_price_cents && (!ev.button_text || ev.button_text === 'Reserve my seat')) ? 'Reserve my free seat' : (ev.button_text || 'Reserve my seat')};
 }
 
@@ -389,7 +390,7 @@ function render(others, proof){
     '<div class="stepper"><span>Seats</span><div class="ctl"><button type="button" id="qm" aria-label="Fewer seats">&minus;</button><span class="v" id="qv">1</span><button type="button" id="qp" aria-label="More seats">+</button></div></div>' +
     (dinnerOn ? '<div class="stepper" id="drow"><span><strong>Add dinner with Bilal</strong><br><span class="fine" style="text-align:left">' + money(ev.dinner_price_cents) + ' each &nbsp;·&nbsp; ' + ev.dinner_left + ' left</span></span><div class="ctl"><button type="button" id="dm" aria-label="Fewer dinners">&minus;</button><span class="v" id="dv">0</span><button type="button" id="dpl" aria-label="More dinners">+</button></div></div>' : '') +
     '<div class="tot"><span>Total</span><span id="tt"></span></div>' +
-    (CHECKOUT_ENABLED && s.open ? '<div class="field"><label for="bn">Full name</label><input id="bn" autocomplete="name"></div><div class="field"><label for="be">Email for your ticket</label><input id="be" type="email" autocomplete="email"></div>' : '') +
+    (s.open ? '<div class="field"><label for="bn">Full name</label><input id="bn" autocomplete="name"></div><div class="field"><label for="be">Email for your ticket</label><input id="be" type="email" autocomplete="email"></div><div style="position:absolute;left:-9999px" aria-hidden="true"><label for="bw">Leave this empty</label><input id="bw" tabindex="-1" autocomplete="off"></div>' : '') +
     '<button class="btn' + (s.open ? '' : ' off') + '" id="buybtn"' + (s.open ? '' : ' disabled') + '>' + btnText + '</button>' +
     '<div class="msg" id="msg" role="alert"></div>' +
     (free ? '<p class="fine">Free to attend. Your ticket is emailed to you.</p>' : '<p class="fine">Cards, Apple Pay and Google Pay. Payments processed securely by Stripe.</p>') +
@@ -453,17 +454,24 @@ function wireBuy(maxQ, dinnerOn, s){
   }
   document.getElementById('buybtn').onclick = function(){ if (s.open) checkout(); };
 }
+function go(u){ location.href = u; }
 async function checkout(){
   var msg = document.getElementById('msg'); msg.textContent = '';
   var name = (document.getElementById('bn') || {}).value || '', email = (document.getElementById('be') || {}).value || '';
+  var trap = (document.getElementById('bw') || {}).value || '';
   if (!name.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) { msg.textContent = 'Please enter your name and a valid email.'; return; }
+  var paid = total() > 0;
+  if (paid && !CHECKOUT_ENABLED) { msg.textContent = 'Paid options open soon. Please remove the dinner to reserve your free seat.'; return; }
   var btn = document.getElementById('buybtn'); btn.disabled = true;
+  var again = function(){ btn.disabled = false; };
   try {
-    var r = await fetch(API + '/api/public/events/' + encodeURIComponent(ev.slug) + '/checkout', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ qty: qty, dinner_qty: dq, name: name.trim(), email: email.trim() }) });
-    var d = await r.json();
-    if (!r.ok || !d.url) { msg.textContent = d.error || 'Sorry, we could not start the payment. Please try again.'; btn.disabled = false; return; }
-    location.href = d.url;
-  } catch (e) { msg.textContent = 'Network problem. Please try again.'; btn.disabled = false; }
+    var r = await fetch(API + '/api/public/events/' + encodeURIComponent(ev.slug) + (paid ? '/checkout' : '/register'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ qty: qty, dinner_qty: dq, name: name.trim(), email: email.trim(), website: trap }) });
+    var d = {}; try { d = await r.json(); } catch (e0) {}
+    if (!r.ok) { msg.textContent = d.error || 'Sorry, we could not complete your booking. Please try again.'; again(); return; }
+    if (d.url) { go(d.url); return; }
+    if (d.token) { go('ticket.html?t=' + encodeURIComponent(d.token)); return; }
+    msg.textContent = 'Thank you.'; again();
+  } catch (e) { msg.textContent = 'Network problem. Please try again.'; again(); }
 }
 
 // ---------- load ----------
