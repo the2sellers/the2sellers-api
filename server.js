@@ -12,7 +12,7 @@ const { sendNotification } = require('./email');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ verify: function (req, res, buf) { req.rawBody = buf; } }));
 app.use('/admin', express.static(require('path').join(__dirname, 'admin')));
 require('./bookings')(app, pool);
 
