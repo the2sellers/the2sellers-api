@@ -75,12 +75,20 @@
   </div>
   <p style="color:#5B5D63;font-size:14px;margin-bottom:20px">Seminars and online sessions. Each event gets its own ticket page. Set an event to Published when it is ready for the public.</p>
 
+  <div id="emailNotice" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px"></div>
+
   <div id="attendeesBox" class="detail-card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-      <h2 id="attTitle" style="margin:0">Attendees</h2>
-      <div style="display:flex;gap:8px"><button class="btn-secondary" onclick="exportCsv()">Download CSV</button><button class="btn-secondary" onclick="closeAttendees()">Close</button></div>
+      <h2 id="attTitle" style="margin:0">Bookings</h2>
+      <div style="display:flex;gap:8px"><button class="btn-secondary" onclick="exportCsv()">Download list (CSV)</button><button class="btn-secondary" onclick="closeAttendees()">Close</button></div>
     </div>
-    <div id="attBody" style="margin-top:14px"></div>
+    <details style="margin-top:14px">
+      <summary style="cursor:pointer;font-weight:600;font-size:14px">WhatsApp message template</summary>
+      <div class="hint" style="margin:8px 0">Used for the WhatsApp buttons and the CSV. Placeholders: {name} {first_name} {event} {city} {when} {where} {count} {codes} {link}</div>
+      <textarea id="waTpl" style="width:100%;min-height:90px;padding:9px 11px;border:1px solid #D8D3C4;border-radius:6px;font-size:14px;font-family:inherit;box-sizing:border-box"></textarea>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center"><button class="btn-primary" onclick="saveTemplate()">Save template</button><button class="btn-secondary" onclick="resetTemplate()">Use the default</button><span id="waTplOk" style="color:#1F6B3F;font-size:13px"></span></div>
+    </details>
+    <div id="attBody" style="margin-top:14px;overflow-x:auto"></div>
   </div>
 
   <div id="eventForm" class="detail-card">
@@ -415,39 +423,110 @@ async function saveEvent() {
   } finally { $('saveBtn').disabled = false; }
 }
 
-// ---- attendees ----
+// ---- bookings, WhatsApp and CSV ----
+let bookingData = null;
+let waTemplate = '';
+let waDefault = '';
+
+async function loadTemplate() {
+  try {
+    const r = await fetch(API + '/api/admin/whatsapp-template', { headers: { 'Authorization': 'Bearer ' + token } });
+    const d = await r.json();
+    waTemplate = d.template; waDefault = d.default;
+    $('waTpl').value = waTemplate;
+  } catch (e) {}
+}
+async function saveTemplate() {
+  const r = await fetch(API + '/api/admin/whatsapp-template', { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ template: $('waTpl').value }) });
+  if (!r.ok) { alert('Could not save the template.'); return; }
+  const d = await r.json(); waTemplate = d.template; $('waTpl').value = waTemplate;
+  $('waTplOk').textContent = 'Saved'; setTimeout(function () { $('waTplOk').textContent = ''; }, 2500);
+  renderBookings();
+}
+function resetTemplate() { $('waTpl').value = waDefault; }
+function fillTemplate(tpl, o) {
+  const ev = bookingData.event;
+  const codes = o.tickets.map(function (t) { return t.code; }).join(', ');
+  const map = { name: o.name, first_name: String(o.name || '').split(' ')[0], event: ev.title, city: ev.city, when: ev.when_text, where: ev.place_text || 'to be announced', count: String(o.tickets.length), codes: codes, link: o.ticket_url || '' };
+  return String(tpl).replace(/\{(\w+)\}/g, function (m, k) { return map[k] !== undefined ? map[k] : m; });
+}
+function waLink(phone, msg) {
+  const digits = String(phone || '').replace(/[^0-9]/g, '');
+  return digits ? 'https://wa.me/' + digits + '?text=' + encodeURIComponent(msg) : '';
+}
+function amountText(o) { return o.amount_cents ? money(o.amount_cents, o.currency) : 'Free'; }
+function emailText(s) { if (!s) return 'not sent'; if (s === 'sent') return 'sent'; if (s === 'skipped') return 'not sent'; return 'failed'; }
+
+function renderBookings() {
+  if (!bookingData) return;
+  const orders = bookingData.orders;
+  if (!orders.length) { $('attBody').innerHTML = '<div class="empty-state">No bookings yet.</div>'; return; }
+  const seats = orders.filter(function (o) { return o.status === 'paid'; }).reduce(function (n, o) { return n + o.tickets.length; }, 0);
+  $('attBody').innerHTML = '<div class="hint" style="margin-bottom:8px">' + orders.length + ' booking' + (orders.length === 1 ? '' : 's') + ', ' + seats + ' seat' + (seats === 1 ? '' : 's') + '</div>' +
+    '<table class="att"><thead><tr><th>Name</th><th>Email</th><th>WhatsApp</th><th>Tickets</th><th>Paid</th><th>Email</th><th></th></tr></thead><tbody>' +
+    orders.map(function (o) {
+      const msg = fillTemplate(waTemplate, o);
+      const link = waLink(o.phone, msg);
+      const dinner = o.tickets.filter(function (t) { return t.has_dinner; }).length;
+      return '<tr><td>' + esc(o.name) + '</td><td>' + esc(o.email) + '</td>' +
+        '<td>' + esc(o.phone || '') + (o.phone ? '<div class="hint" style="margin:0">' + (o.whatsapp_ok ? 'OK to message' : 'no WhatsApp consent') + '</div>' : '') + '</td>' +
+        '<td>' + o.tickets.length + (dinner ? ' (' + dinner + ' dinner)' : '') + '</td><td>' + esc(amountText(o)) + (o.status !== 'paid' ? ' · ' + esc(o.status) : '') + '</td>' +
+        '<td>' + esc(emailText(o.email_status)) + '</td>' +
+        '<td>' + (link ? '<a class="btn-secondary" style="text-decoration:none;display:inline-block;padding:6px 12px;font-size:13px" href="' + esc(link) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
 async function showAttendees(id) {
   const ev = events.find(function (x) { return x.id === id; });
-  attendeeEvent = ev;
-  const r = await fetch(API + '/api/admin/events/' + id + '/attendees', { headers: { 'Authorization': 'Bearer ' + token } });
-  if (!r.ok) { alert('Could not load attendees.'); return; }
-  attendeeRows = await r.json();
-  $('attTitle').textContent = 'Attendees: ' + (ev ? ev.city + ' — ' + ev.title : '');
-  if (!attendeeRows.length) {
-    $('attBody').innerHTML = '<div class="empty-state">No tickets sold yet.</div>';
-  } else {
-    $('attBody').innerHTML = '<table class="att"><thead><tr><th>Buyer</th><th>Email</th><th>Ticket</th><th>Dinner</th><th>Order</th><th>Checked in</th></tr></thead><tbody>' +
-      attendeeRows.map(function (a) {
-        return '<tr><td>' + esc(a.holder_name || a.buyer_name) + '</td><td>' + esc(a.buyer_email) + '</td><td>' + esc(a.code) + '</td><td>' + (a.has_dinner ? 'Yes' : '') + '</td><td>' + esc(a.status) + '</td><td>' + (a.checked_in_at ? 'Yes' : '') + '</td></tr>';
-      }).join('') + '</tbody></table>';
-  }
+  const r = await fetch(API + '/api/admin/events/' + id + '/bookings', { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!r.ok) { alert('Could not load bookings.'); return; }
+  bookingData = await r.json();
+  bookingData.slug = ev ? ev.slug : 'event';
+  if (!waTemplate) await loadTemplate();
+  $('attTitle').textContent = 'Bookings: ' + (ev ? ev.city + ', ' + ev.title : '');
+  renderBookings();
   $('attendeesBox').classList.add('open');
   $('attendeesBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
-function previewEvent(id) { window.open('/admin/event.html?id=' + id + '&preview=1', '_blank'); }
 function closeAttendees() { $('attendeesBox').classList.remove('open'); }
+function previewEvent(id) { window.open('/admin/event.html?id=' + id + '&preview=1', '_blank'); }
 function exportCsv() {
-  const head = ['Buyer', 'Email', 'Ticket code', 'Dinner', 'Order status', 'Checked in', 'Ordered'];
-  const rows = attendeeRows.map(function (a) { return [a.holder_name || a.buyer_name, a.buyer_email, a.code, a.has_dinner ? 'Yes' : 'No', a.status, a.checked_in_at ? 'Yes' : 'No', a.created_at]; });
+  if (!bookingData) return;
+  const head = ['Booking', 'Name', 'Email', 'Phone', 'WhatsApp consent', 'Tickets', 'Dinner seats', 'Ticket codes', 'Amount', 'Currency', 'Status', 'Email status', 'Ticket link', 'WhatsApp message', 'WhatsApp link', 'Booked at'];
+  const rows = bookingData.orders.map(function (o) {
+    const msg = fillTemplate(waTemplate, o);
+    return [o.id, o.name, o.email, o.phone || '', o.whatsapp_ok ? 'Yes' : 'No', o.tickets.length, o.tickets.filter(function (t) { return t.has_dinner; }).length, o.tickets.map(function (t) { return t.code; }).join(' '), (o.amount_cents / 100).toFixed(2), String(o.currency || '').toUpperCase(), o.status, o.email_status || '', o.ticket_url || '', msg, waLink(o.phone, msg), o.created_at];
+  });
   const csv = [head].concat(rows).map(function (r) { return r.map(function (c) { return '"' + String(c === null || c === undefined ? '' : c).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'attendees-' + (attendeeEvent ? attendeeEvent.slug : 'event') + '.csv';
+  a.download = 'bookings-' + (bookingData.slug || 'event') + '.csv';
   document.body.appendChild(a); a.click(); a.remove();
 }
 
+// ---- customer email health notice ----
+async function checkEmail() {
+  const el = $('emailNotice');
+  try {
+    const r = await fetch(API + '/api/admin/email-status', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) return;
+    const d = await r.json();
+    let ok = false, text = '';
+    if (!d.api_key_set) text = 'Ticket emails are off: no email key is set on the server.';
+    else if (d.error) text = 'Could not check the ticket email setup (' + d.error + '). Tickets are still shown on screen after booking.';
+    else if (d.domain_status === 'verified') { ok = true; text = 'Ticket emails are ready: sending from ' + d.ticket_from + '.'; }
+    else if (d.domain_status === 'not_added') text = 'Ticket emails will not reach buyers yet: ' + d.domain + ' has not been added to Resend. Buyers still see their tickets on screen.';
+    else text = 'Ticket emails will not reach buyers yet: ' + d.domain + ' is "' + d.domain_status + '" in Resend. Finish the DNS verification. Buyers still see their tickets on screen.';
+    el.style.display = 'block';
+    el.style.background = ok ? '#E6F2EA' : '#FFF3D6';
+    el.style.border = '1px solid ' + (ok ? '#B9D9C4' : '#EAD28F');
+    el.style.color = ok ? '#1F6B3F' : '#7A5C0A';
+    el.textContent = text;
+  } catch (e) {}
+}
+
 loadEvents();
+checkEmail();
 </script>
 </body>
 </html>
