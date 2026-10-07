@@ -77,11 +77,12 @@
 
   <div id="emailNotice" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px"></div>
   <div id="payNotice" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px"></div>
+  <div style="margin-bottom:16px"><button class="btn-secondary" onclick="runChecks()">Run the daily check now</button> <span id="checkOut" class="hint"></span></div>
 
   <div id="attendeesBox" class="detail-card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <h2 id="attTitle" style="margin:0">Bookings</h2>
-      <div style="display:flex;gap:8px"><button class="btn-secondary" onclick="exportCsv()">Download list (CSV)</button><button class="btn-secondary" onclick="closeAttendees()">Close</button></div>
+      <div style="display:flex;gap:8px"><button class="btn-secondary" onclick="exportCsv()">Download list (CSV)</button><button class="btn-secondary" style="color:#6B1E23;border-color:#E0C7C9" onclick="cancelEvent()">Cancel event and refund everyone</button><button class="btn-secondary" onclick="closeAttendees()">Close</button></div>
     </div>
     <details style="margin-top:14px">
       <summary style="cursor:pointer;font-weight:600;font-size:14px">WhatsApp message template</summary>
@@ -162,7 +163,7 @@
     <div class="row4">
       <div><label>Ticket price</label><input type="number" id="f_price" min="0" step="0.01" placeholder="0.00" /></div>
       <div><label>Total seats</label><input type="number" id="f_capacity" min="0" step="1" placeholder="100" /></div>
-      <div><label>Minimum to run</label><input type="number" id="f_min" min="0" step="1" placeholder="0" /><div class="hint">Everyone is refunded if not reached.</div></div>
+      <div><label>Minimum to run</label><input type="number" id="f_min" min="0" step="1" placeholder="0" /><div class="hint">You get an email alert if bookings are below this near the decision date. You decide whether to cancel.</div></div>
       <div><label>Refund up to (days before)</label><input type="number" id="f_refund" min="0" step="1" placeholder="7" /></div>
     </div>
     <div class="row2">
@@ -512,6 +513,38 @@ async function refundOrder(id, paid) {
   if (!r.ok) { alert(d.error || 'Could not complete that.'); return; }
   await showAttendees(bookingData.event.id);
   loadEvents();
+}
+
+async function cancelEvent() {
+  if (!bookingData) return;
+  const d = bookingData;
+  const paid = d.orders.filter(function (o) { return o.status === 'paid'; });
+  const cents = paid.reduce(function (n, o) { return n + o.amount_cents; }, 0);
+  const msg = 'Cancel "' + d.event.title + '" and refund everyone?\n\n' + paid.length + ' booking' + (paid.length === 1 ? '' : 's') + ' will be cancelled' + (cents ? ' and ' + money(cents, d.event.currency) + ' will be refunded in full' : '') + '. Every buyer gets an email. New sales stop straight away. This cannot be undone.';
+  if (!confirm(msg)) return;
+  if (!confirm('Last check: really cancel the event and refund everyone?')) return;
+  const r = await fetch(API + '/api/admin/events/' + d.event.id + '/cancel-refund', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true }) });
+  let o = {}; try { o = await r.json(); } catch (e) {}
+  if (!r.ok) { alert(o.error || 'Could not cancel the event.'); return; }
+  alert('Event cancelled.\n\nRefunded: ' + o.refunded + ' booking(s), ' + money(o.refunded_cents, d.event.currency) + '\nFree bookings cancelled: ' + o.cancelled_free + '\nBuyers emailed: ' + o.emailed + (o.failed && o.failed.length ? '\n\nSOME COULD NOT BE REFUNDED (press the button again to retry):\n' + o.failed.map(function (f) { return f.name + ': ' + f.error; }).join('\n') : ''));
+  await showAttendees(d.event.id);
+  loadEvents();
+}
+
+async function runChecks() {
+  const out = $('checkOut');
+  out.textContent = 'Checking…';
+  try {
+    const r = await fetch(API + '/api/admin/daily-checks', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+    const d = await r.json();
+    if (!r.ok) { out.textContent = d.error || 'Could not run the check.'; return; }
+    const bits = ['Checked ' + d.stripe_checked + ' recent Stripe payment' + (d.stripe_checked === 1 ? '' : 's') + '.'];
+    bits.push(d.healed.length ? 'Repaired ' + d.healed.length + ' missed payment' + (d.healed.length === 1 ? '' : 's') + '.' : 'Nothing needed repairing.');
+    if (d.expired_orders) bits.push('Tidied ' + d.expired_orders + ' old unpaid booking' + (d.expired_orders === 1 ? '' : 's') + '.');
+    d.short_events.forEach(function (x) { bits.push(x.city + ' has ' + x.sold + ' of ' + x.min + ' seats (decision date ' + x.decision_date + ').'); });
+    d.problems.forEach(function (x) { bits.push('Problem: ' + x); });
+    out.textContent = bits.join(' ');
+  } catch (e) { out.textContent = 'Could not run the check.'; }
 }
 
 // ---- payments health notice ----
