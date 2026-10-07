@@ -4,12 +4,17 @@
 
 const crypto = require('crypto');
 const { requireAuth, requireAdmin } = require('./auth');
-const { sendNotification } = require('./email');
+const { sendNotification, sendMail } = require('./email');
 
 const EVENT_PAGE_URL = process.env.EVENT_PAGE_URL || 'https://the2sellers-api.onrender.com/admin/event.html';
 const HOLD_MINUTES = 32;        // seats are held this long while the buyer pays
 const STRIPE_SESSION_MINUTES = 31; // Stripe needs at least 30
 const SIG_TOLERANCE_S = 300;
+
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+}
+function moneyText(cents, cur) { return (cents / 100).toFixed(2) + ' ' + String(cur || '').toUpperCase(); }
 
 function flatten(obj, prefix, out) {
   out = out || [];
@@ -282,6 +287,128 @@ module.exports = function mountPayments(app, pool, h) {
     }
     await pool.query("UPDATE orders SET status = 'cancelled' WHERE id = $1", [o.id]);
     res.json({ ok: true, refunded_cents: 0, status: 'cancelled' });
+  }));
+
+  // ---------- admin: cancel an event and refund everyone (the organiser decides, never automatic) ----------
+  async function cancelEventAndRefund(eventId) {
+    const evr = await pool.query('SELECT * FROM events WHERE id = $1', [eventId]);
+    const ev = evr.rows[0];
+    if (!ev) return { notFound: true };
+    await pool.query("UPDATE events SET status = 'cancelled' WHERE id = $1", [eventId]);   // stop new sales first
+    await pool.query("UPDATE orders SET status = 'expired', hold_expires_at = NULL WHERE event_id = $1 AND status = 'pending'", [eventId]);
+    const orders = (await pool.query("SELECT * FROM orders WHERE event_id = $1 AND status = 'paid' ORDER BY id", [eventId])).rows;
+    const out = { event: ev.title, city: ev.city, refunded: 0, refunded_cents: 0, cancelled_free: 0, emailed: 0, failed: [] };
+    for (let i = 0; i < orders.length; i++) {
+      const o = orders[i];
+      try {
+        let refundLine;
+        if (o.amount_cents > 0) {
+          if (!o.stripe_payment_intent) throw new Error('no Stripe payment on record');
+          await stripe('POST', '/v1/refunds', { payment_intent: o.stripe_payment_intent, metadata: { order_id: String(o.id), reason: 'event_cancelled' } }, 'refund-cancel-' + o.id);
+          await pool.query("UPDATE orders SET status = 'refunded', refunded_at = NOW() WHERE id = $1", [o.id]);
+          out.refunded++; out.refunded_cents += o.amount_cents;
+          refundLine = 'Your payment of ' + moneyText(o.amount_cents, o.currency) + ' has been refunded in full to the card you paid with. Banks usually show it within 5 to 10 business days.';
+        } else {
+          await pool.query("UPDATE orders SET status = 'cancelled' WHERE id = $1", [o.id]);
+          out.cancelled_free++;
+          refundLine = 'Your free booking has been cancelled, so there is nothing to pay or refund.';
+        }
+        try {
+          const subject = 'Event cancelled: ' + ev.title;
+          const text = 'Hello ' + o.buyer_name + ',\n\nWe are very sorry: ' + ev.title + ' (' + ev.city + ') has been cancelled.\n\n' + refundLine + '\n\nIf you have any questions, just reply to this email.\n\nThe2Sellers.io\n';
+          const html = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0F0F12"><h2 style="font-family:Georgia,serif;font-weight:normal">Event cancelled</h2><p>Hello ' + esc(o.buyer_name) + ',</p><p>We are very sorry: <strong>' + esc(ev.title) + '</strong> (' + esc(ev.city) + ') has been cancelled.</p><p>' + esc(refundLine) + '</p><p>If you have any questions, just reply to this email.</p><p style="color:#5B5D63">The2Sellers.io</p></div>';
+          const r = await sendMail({ to: o.buyer_email, subject: subject, html: html, text: text });
+          if (r && r.ok) out.emailed++;
+        } catch (e2) { /* the refund already happened; email failure is not fatal */ }
+      } catch (e) {
+        out.failed.push({ order_id: o.id, name: o.buyer_name, email: o.buyer_email, error: e.message });
+      }
+    }
+    try {
+      await sendNotification('Event cancelled and refunded: ' + ev.city,
+        ev.title + ' (' + ev.city + ') was cancelled.\nRefunded: ' + out.refunded + ' booking(s), ' + moneyText(out.refunded_cents, ev.currency) + '\nFree bookings cancelled: ' + out.cancelled_free + '\nBuyers emailed: ' + out.emailed +
+        (out.failed.length ? '\n\nACTION NEEDED, these could not be refunded automatically:\n' + out.failed.map(function (f) { return '- ' + f.name + ' <' + f.email + '> (order ' + f.order_id + '): ' + f.error; }).join('\n') : '\n\nEverything went through.') + '\n');
+    } catch (e) { /* ignore */ }
+    return out;
+  }
+
+  app.post('/api/admin/events/:id/cancel-refund', requireAuth, requireAdmin, ah(async function (req, res) {
+    await h.ensureSchema(pool);
+    if (!(req.body && (req.body.confirm === true || req.body.confirm === 'true'))) return res.status(400).json({ error: 'Please confirm the cancellation.' });
+    if (!process.env.STRIPE_SECRET_KEY) {
+      const paidCount = (await pool.query("SELECT COUNT(*)::int AS n FROM orders WHERE event_id = $1 AND status = 'paid' AND amount_cents > 0", [req.params.id])).rows[0].n;
+      if (paidCount > 0) return res.status(503).json({ error: 'Stripe is not connected, so paid bookings cannot be refunded right now.' });
+    }
+    const out = await cancelEventAndRefund(req.params.id);
+    if (out.notFound) return res.status(404).json({ error: 'Event not found' });
+    res.json(out);
+  }));
+
+  // ---------- the daily check: repairs missed payments, tidies old holds, warns about low bookings ----------
+  async function runDailyChecks() {
+    const report = { ran_at: new Date().toISOString(), stripe_checked: 0, healed: [], expired_orders: 0, short_events: [], problems: [] };
+    if (process.env.STRIPE_SECRET_KEY) {
+      try {
+        const since = Math.floor(Date.now() / 1000) - 3 * 24 * 3600;
+        const list = await stripe('GET', '/v1/checkout/sessions', { limit: 100, created: { gte: since } });
+        for (let i = 0; i < (list.data || []).length; i++) {
+          const s = list.data[i];
+          const oid = parseInt((s.metadata && s.metadata.order_id) || s.client_reference_id, 10);
+          if (!oid) continue;
+          const o = (await pool.query('SELECT id, status, stripe_session_id FROM orders WHERE id = $1', [oid])).rows[0];
+          if (!o || o.stripe_session_id !== s.id) continue;   // not one of ours
+          report.stripe_checked++;
+          if (s.payment_status === 'paid' && o.status === 'pending') {
+            const f = await fulfil(o.id, s);
+            report.healed.push({ order_id: o.id, result: f.state });
+          } else if (s.status === 'expired' && o.status === 'pending') {
+            await pool.query("UPDATE orders SET status = 'expired', hold_expires_at = NULL WHERE id = $1", [o.id]);
+            report.expired_orders++;
+          }
+        }
+        if (list.has_more) report.problems.push('More than 100 recent Stripe sessions exist; only the newest 100 were checked.');
+      } catch (e) { report.problems.push('Could not check Stripe: ' + e.message); }
+    }
+    const stale = await pool.query("UPDATE orders SET status = 'expired', hold_expires_at = NULL WHERE status = 'pending' AND hold_expires_at < NOW() - interval '2 hours' RETURNING id");
+    report.expired_orders += stale.rowCount;
+    const evs = await pool.query(
+      "SELECT e.id, e.city, e.title, e.starts_at, e.min_attendance, e.refund_cutoff_days, " +
+      "(SELECT COUNT(*)::int FROM tickets t JOIN orders o ON o.id = t.order_id WHERE t.event_id = e.id AND o.status = 'paid') AS sold " +
+      "FROM events e WHERE e.status = 'published' AND e.min_attendance > 0 AND e.starts_at > NOW()");
+    evs.rows.forEach(function (e) {
+      const decision = new Date(new Date(e.starts_at).getTime() - Math.max(e.refund_cutoff_days || 0, 1) * 24 * 3600 * 1000);
+      const daysToDecision = Math.ceil((decision.getTime() - Date.now()) / (24 * 3600 * 1000));
+      if (daysToDecision <= 3 && e.sold < e.min_attendance) {
+        report.short_events.push({ id: e.id, city: e.city, title: e.title, sold: e.sold, min: e.min_attendance, decision_date: decision.toISOString().slice(0, 10), days_to_decision: daysToDecision });
+      }
+    });
+    const notable = report.healed.length || report.problems.length || report.short_events.length;
+    if (notable) {
+      const lines = [];
+      report.healed.forEach(function (x) { lines.push('Fixed a missed payment: order ' + x.order_id + ' (' + x.result + ')'); });
+      report.short_events.forEach(function (x) {
+        lines.push('DECISION NEEDED: ' + x.city + ' has ' + x.sold + ' of ' + x.min + ' seats. ' + (x.days_to_decision > 0 ? 'The decision date is ' + x.decision_date + ' (in ' + x.days_to_decision + ' day' + (x.days_to_decision === 1 ? '' : 's') + ').' : 'The decision date (' + x.decision_date + ') has arrived.') + ' Nothing happens automatically: keep the event, or use "Cancel event and refund everyone" in the admin.');
+      });
+      report.problems.forEach(function (x) { lines.push('Problem: ' + x); });
+      try { await sendNotification('Daily check: ' + (report.short_events.length ? 'decision needed' : (report.problems.length ? 'a problem' : 'payments repaired')), lines.join('\n') + '\n'); } catch (e) { /* ignore */ }
+    }
+    return report;
+  }
+
+  // Your hosting scheduler calls this once a day. It does nothing risky and runs at most once every 20 hours.
+  app.post('/api/public/cron/daily', ah(async function (req, res) {
+    await h.ensureSchema(pool);
+    await pool.query('ALTER TABLE host_profile ADD COLUMN IF NOT EXISTS daily_last_run TIMESTAMPTZ');
+    const g = await pool.query("UPDATE host_profile SET daily_last_run = NOW() WHERE id = 1 AND (daily_last_run IS NULL OR daily_last_run < NOW() - interval '20 hours') RETURNING id");
+    if (!g.rowCount) return res.json({ ran: false });
+    await runDailyChecks();
+    res.json({ ran: true });
+  }));
+
+  // Same check, run by an admin on demand, with the full report.
+  app.post('/api/admin/daily-checks', requireAuth, requireAdmin, ah(async function (req, res) {
+    await h.ensureSchema(pool);
+    res.json(await runDailyChecks());
   }));
 
   // ---------- admin: is Stripe connected, and to which account? (never reveals the key) ----------
