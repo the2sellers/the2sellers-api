@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Your tickets | The2Sellers.io</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{--ink:#0F0F12;--paper:#FAFAF7;--gold:#E8B939;--mut:#B9B9BE;--display:'Fraunces',Georgia,serif;--body:'Inter',-apple-system,Segoe UI,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--body);line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.top{border-bottom:1px solid #26262C}
+.top .in{max-width:760px;margin:0 auto;padding:18px 22px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-family:var(--display);font-size:22px;font-weight:600;text-decoration:none}
+.logo span{color:var(--gold)}
+.wrap{max-width:760px;margin:0 auto;padding:36px 22px 80px}
+.eb{font-size:12px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,5vw,44px);line-height:1.1;margin:10px 0 8px}
+.mut{color:var(--mut)}
+.info{margin:18px 0 28px;display:grid;gap:6px}
+.info div{display:flex;gap:10px}
+.info b{min-width:76px;color:var(--mut);font-weight:500}
+.tk{background:var(--paper);color:var(--ink);border-radius:10px;padding:22px;margin-bottom:18px;display:grid;grid-template-columns:200px 1fr;gap:22px;align-items:center}
+.tk img{width:200px;height:200px;image-rendering:pixelated}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:20px;letter-spacing:.08em;word-break:break-all}
+.tag{display:inline-block;font-size:12px;font-weight:600;border-radius:20px;padding:3px 10px;margin-top:10px;background:#F2EFE6;border:1px solid #DDD9CB}
+.tag.gold{background:#FFF3D6;border-color:#EAD28F;color:#7A5C0A}
+.tag.ok{background:#E6F2EA;border-color:#B9D9C4;color:#1F6B3F}
+.btn{display:inline-block;background:var(--gold);color:var(--ink);font-weight:600;font-size:15px;padding:13px 22px;border-radius:4px;border:0;text-decoration:none;cursor:pointer;font-family:var(--body)}
+.btn2{display:inline-block;color:var(--paper);border:1px solid #55555C;font-size:15px;padding:12px 20px;border-radius:4px;text-decoration:none;background:none;cursor:pointer;font-family:var(--body)}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0 28px}
+.state{padding:80px 0;text-align:center}
+@media(max-width:560px){.tk{grid-template-columns:1fr;text-align:center}.tk img{margin:0 auto}}
+@media print{body{background:#fff;color:#000}.top,.row,.noprint{display:none}.tk{border:1px solid #999;break-inside:avoid}.mut,.info b{color:#444}}
+</style>
+</head>
+<body>
+<div class="top"><div class="in"><a class="logo" href="https://the2sellers.io/">The2Sellers<span>.io</span></a></div></div>
+<div class="wrap" id="app"><div class="state mut">Loading your tickets…</div></div>
+<script>
+var API = 'https://the2sellers-api.onrender.com';
+var HOME = 'https://the2sellers.io/';
+function esc(s){ if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function when(iso, endIso, tz){
+  if (!iso) return 'Date to be announced';
+  try {
+    var d = new Date(iso);
+    var day = new Intl.DateTimeFormat('en-AU', {timeZone:tz, weekday:'long', day:'numeric', month:'long', year:'numeric'}).format(d);
+    var t1 = new Intl.DateTimeFormat('en-AU', {timeZone:tz, hour:'numeric', minute:'2-digit'}).format(d);
+    var out = day + ', ' + t1;
+    if (endIso) out += ' to ' + new Intl.DateTimeFormat('en-AU', {timeZone:tz, hour:'numeric', minute:'2-digit', timeZoneName:'short'}).format(new Date(endIso));
+    return out;
+  } catch (e) { return ''; }
+}
+function icsStamp(iso){ return new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); }
+function calUrl(ev){
+  if (!ev.starts_at) return '';
+  var end = ev.ends_at || new Date(new Date(ev.starts_at).getTime() + 3 * 3600 * 1000).toISOString();
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(ev.title) + '&dates=' + icsStamp(ev.starts_at) + '/' + icsStamp(end) + '&location=' + encodeURIComponent(ev.is_online ? 'Online' : [ev.venue, ev.address].filter(Boolean).join(', '));
+}
+function show(html){ document.getElementById('app').innerHTML = html; }
+function problem(t){ show('<div class="state"><h1>' + esc(t) + '</h1><p class="mut"><a href="' + HOME + '">Back to The2Sellers.io</a></p></div>'); }
+async function load(){
+  var t = new URLSearchParams(location.search).get('t');
+  if (!t) { problem('We could not find your tickets'); return; }
+  try {
+    var r = await fetch(API + '/api/public/orders/' + encodeURIComponent(t));
+    if (r.status === 404) { problem('We could not find your tickets'); return; }
+    if (!r.ok) { problem('Something went wrong. Please try again.'); return; }
+    var o = await r.json(), ev = o.event;
+    if (o.status !== 'paid') { problem('This booking is not confirmed yet'); return; }
+    var place = ev.is_online ? 'Live online' : [ev.venue, ev.address].filter(Boolean).join(', ');
+    var cal = calUrl(ev);
+    var tickets = o.tickets.map(function(k, i){
+      return '<div class="tk"><img src="' + API + '/api/public/tickets/' + encodeURIComponent(k.code) + '/qr.png" alt="QR code for ticket ' + esc(k.code) + '">' +
+        '<div><div class="mut" style="font-size:13px">Ticket ' + (i + 1) + ' of ' + o.tickets.length + '</div><div class="code">' + esc(k.code) + '</div>' +
+        '<div style="margin-top:6px">' + esc(o.buyer_name) + '</div>' +
+        (k.has_dinner ? '<span class="tag gold">Includes dinner</span> ' : '') + (k.checked_in ? '<span class="tag ok">Checked in</span>' : '') + '</div></div>';
+    }).join('');
+    document.title = 'Your tickets | ' + ev.title;
+    show('<div class="eb">You are booked in</div><h1>' + esc(ev.title) + '</h1>' +
+      '<div class="info"><div><b>When</b><span>' + esc(when(ev.starts_at, ev.ends_at, ev.timezone)) + '</span></div><div><b>Where</b><span>' + esc(place || 'To be announced') + '</span></div></div>' +
+      '<div class="row">' + (cal ? '<a class="btn" href="' + esc(cal) + '" target="_blank" rel="noopener">Add to calendar</a>' : '') + '<button class="btn2" onclick="window.print()">Print tickets</button></div>' +
+      tickets + '<p class="mut noprint" style="font-size:14px">Show the QR code at the door. Keep this page, or the email we sent you, safe. Anyone with this link can see these tickets.</p>');
+  } catch (e) { problem('Something went wrong. Please try again.'); }
+}
+load();
+</script>
+</body>
+</html>
