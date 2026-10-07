@@ -71,7 +71,21 @@ async function load(){
     if (r.status === 404) { problem('We could not find your tickets'); return; }
     if (!r.ok) { problem('Something went wrong. Please try again.'); return; }
     var o = await r.json(), ev = o.event;
-    if (o.status !== 'paid') { problem('This booking is not confirmed yet'); return; }
+    if (o.status === 'pending') {
+      if (new URLSearchParams(location.search).get('paid') !== '1') { problem('This booking is waiting for payment'); return; }
+      show('<div class="state"><h1>Confirming your payment…</h1><p class="mut">This usually takes a few seconds. Please keep this page open.</p></div>');
+      for (var i = 0; i < 12; i++) {
+        try {
+          var c = await (await fetch(API + '/api/public/orders/' + encodeURIComponent(t) + '/confirm', { method: 'POST' })).json();
+          if (c.status === 'paid') { location.reload(); return; }
+          if (c.status !== 'pending') break;
+        } catch (e) {}
+        await new Promise(function (r) { setTimeout(r, 2500); });
+      }
+      problem('We are still confirming your payment. Your ticket will be emailed to you shortly, or refresh this page in a minute.');
+      return;
+    }
+    if (o.status !== 'paid') { problem('This booking is not available'); return; }
     var place = ev.is_online ? 'Live online' : [ev.venue, ev.address].filter(Boolean).join(', ');
     var cal = calUrl(ev);
     var tickets = o.tickets.map(function(k, i){
