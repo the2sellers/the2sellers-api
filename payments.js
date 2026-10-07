@@ -226,9 +226,17 @@ module.exports = function mountPayments(app, pool, h) {
       const ev = req.body || {};
       const obj = (ev.data && ev.data.object) || {};
       const orderId = parseInt(obj.client_reference_id || (obj.metadata && obj.metadata.order_id), 10);
-      if (orderId && (ev.type === 'checkout.session.completed' || ev.type === 'checkout.session.async_payment_succeeded')) {
+      // This Stripe account may also serve other sites. Only act on checkout sessions that WE created for that order.
+      let ours = false;
+      if (orderId && obj.id) {
+        const own = await pool.query('SELECT stripe_session_id FROM orders WHERE id = $1', [orderId]);
+        if (own.rows[0] && !own.rows[0].stripe_session_id) return res.status(503).json({ error: 'Order not ready yet' });   // Stripe will retry
+        ours = !!own.rows[0] && own.rows[0].stripe_session_id === obj.id;
+      }
+      if (!ours) return res.json({ received: true, ignored: true });
+      if (ev.type === 'checkout.session.completed' || ev.type === 'checkout.session.async_payment_succeeded') {
         await fulfil(orderId, obj);
-      } else if (orderId && (ev.type === 'checkout.session.expired' || ev.type === 'checkout.session.async_payment_failed')) {
+      } else if (ev.type === 'checkout.session.expired' || ev.type === 'checkout.session.async_payment_failed') {
         await pool.query("UPDATE orders SET status = 'expired', hold_expires_at = NULL WHERE id = $1 AND status = 'pending'", [orderId]);
       }
       res.json({ received: true });
