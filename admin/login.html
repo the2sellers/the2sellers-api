@@ -17,8 +17,8 @@
     <div id="msgArea"></div>
     <form id="loginForm">
       <div class="field">
-        <label for="email">Email</label>
-        <input type="email" id="email" required autocomplete="username" />
+        <label for="email">Username or email</label>
+        <input type="text" id="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" />
       </div>
       <div class="field">
         <label for="password">Password</label>
@@ -48,14 +48,14 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     if (!res.ok) throw new Error(body.error || 'Login failed');
 
     setSession(body.token, body.user);
-    window.location.href = '/admin/index.html';
+    window.location.href = (body.user && body.user.role === 'door') ? '/admin/checkin.html' : '/admin/index.html';
   } catch (err) {
     msgArea.innerHTML = '<div class="msg msg-error">' + escapeHtml(err.message) + '</div>';
   }
 });
 
 // If already logged in, skip straight to the dashboard
-if (getToken()) window.location.href = '/admin/index.html';
+if (getToken()) { const u = getUser(); window.location.href = (u && u.role === 'door') ? '/admin/checkin.html' : '/admin/index.html'; }
 </script>
 </body>
 </html>
