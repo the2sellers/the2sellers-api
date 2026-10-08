@@ -429,7 +429,16 @@ module.exports = function mountPayments(app, pool, h) {
           name: (a.business_profile && a.business_profile.name) || (a.settings && a.settings.dashboard && a.settings.dashboard.display_name) || null,
           country: a.country || null, charges_enabled: !!a.charges_enabled, default_currency: a.default_currency || null
         };
-      } catch (e) { out.error = e.message; }
+      } catch (e) {
+        // A restricted key may not be allowed to read the account itself. If it can still list checkout pages,
+        // it can do everything we need, so report it as connected and working.
+        if (e.status === 403 || /permission/i.test(e.message || '')) {
+          try {
+            await stripe('GET', '/v1/checkout/sessions', { limit: 1 });
+            out.account = { restricted: true, name: null, country: null, charges_enabled: null, default_currency: null };
+          } catch (e2) { out.error = e2.message; }
+        } else { out.error = e.message; }
+      }
     }
     res.json(out);
   }));
