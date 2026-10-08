@@ -427,4 +427,7 @@ module.exports = function mountPayments(app, pool, h) {
     }
     res.json(out);
   }));
+
+  // Door check-in routes
+  require('./checkin')(app, pool, h);
 };
