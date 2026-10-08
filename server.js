@@ -156,12 +156,52 @@ const uploadBannerImage = multer({
   }
 });
 
+// Events that the owner has ticked "Feature on the homepage banner" show up as hero slides,
+// for as long as they are published, upcoming and not sold out.
+const EVENT_CURRENCY_SYMBOLS = { aud: 'A$', gbp: '£', usd: 'US$', eur: '€', aed: 'AED ', cad: 'C$', nzd: 'NZ$', sgd: 'S$', pkr: 'PKR ', inr: '₹' };
+async function featuredEventSlides() {
+  const { rows } = await pool.query(
+    "SELECT e.id, e.slug, e.city, e.title, e.venue, e.starts_at, e.timezone, e.is_online, e.currency, e.ticket_price_cents, e.capacity, e.banner_image_data, e.button_text, " +
+    "(SELECT COUNT(*)::int FROM tickets t JOIN orders o ON o.id = t.order_id WHERE t.event_id = e.id AND o.status = 'paid') AS sold " +
+    "FROM events e WHERE e.status = 'published' AND e.featured_home = true AND (e.starts_at IS NULL OR e.starts_at > NOW()) " +
+    "ORDER BY e.starts_at ASC NULLS LAST, e.id ASC LIMIT 3");
+  const site = process.env.SITE_URL || 'https://the2sellers.io';
+  return rows.filter(function (r) { return r.capacity - r.sold > 0; }).map(function (r) {
+    const left = r.capacity - r.sold;
+    let when = '';
+    try {
+      if (r.starts_at) {
+        const d = new Date(r.starts_at);
+        when = new Intl.DateTimeFormat('en-AU', { timeZone: r.timezone || undefined, weekday: 'short', day: 'numeric', month: 'long' }).format(d) + ', ' +
+          new Intl.DateTimeFormat('en-AU', { timeZone: r.timezone || undefined, hour: 'numeric', minute: '2-digit' }).format(d);
+      }
+    } catch (e) { when = ''; }
+    const cur = String(r.currency || 'aud').toLowerCase();
+    const price = r.ticket_price_cents ? (EVENT_CURRENCY_SYMBOLS[cur] !== undefined ? EVENT_CURRENCY_SYMBOLS[cur] : cur.toUpperCase() + ' ') + (r.ticket_price_cents / 100).toLocaleString('en-AU') : 'Free';
+    const parts = [when, r.is_online ? 'Live online' : r.venue, price].filter(Boolean);
+    return {
+      id: 'event-' + r.id,
+      label: r.is_online ? 'LIVE ONLINE' : 'LIVE IN ' + String(r.city || '').toUpperCase(),
+      head: r.title,
+      sub: parts.join(' · '),
+      badge: left <= 20 ? 'Only ' + left + ' seat' + (left === 1 ? '' : 's') + ' left' : (r.ticket_price_cents ? '' : 'Free'),
+      dest: site + '/events/' + r.slug,
+      cta: r.button_text || 'Reserve my seat',
+      layout: r.banner_image_data ? 'background' : 'text',
+      image_data: r.banner_image_data || null,
+      img_size: 'medium', img_focus: 'upper', img_style: 'fade'
+    };
+  });
+}
+
 app.get('/api/public/banners', ah(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT id, label, head, sub, badge, dest, layout, image_data, img_size, img_focus, img_style FROM banners
      WHERE is_active = true ORDER BY display_order ASC, id ASC`
   );
-  res.json(rows);
+  let featured = [];
+  try { featured = await featuredEventSlides(); } catch (e) { featured = []; }
+  res.json(featured.concat(rows));
 }));
 
 app.get('/api/admin/banners', requireAuth, ah(async (req, res) => {
@@ -639,6 +679,7 @@ function cleanEventBody(body) {
     out[f] = (f === 'banner_overlay') ? Math.min(n, 90) : n;
   });
   if (body.is_online !== undefined) out.is_online = (body.is_online === true || body.is_online === 'true');
+  if (body.featured_home !== undefined) out.featured_home = (body.featured_home === true || body.featured_home === 'true');
   ['agenda', 'faq'].forEach((f) => {
     if (body[f] === undefined) return;
     try {
