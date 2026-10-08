@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<title>Door check-in | The2Sellers.io</title>
+<style>
+:root{--ink:#0F0F12;--ink2:#17171B;--paper:#FAFAF7;--gold:#E8B939;--mut:#B9B9BE;--line:#2E2E34;--ok:#1F8A4C;--warn:#C98A12;--bad:#B3261E}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:-apple-system,Segoe UI,Roboto,Inter,sans-serif;line-height:1.45;-webkit-font-smoothing:antialiased}
+.top{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--ink);z-index:5}
+.top b{font-size:17px}.top a{color:var(--mut);font-size:14px;text-decoration:none}
+.wrap{max-width:720px;margin:0 auto;padding:14px 14px 80px}
+select,input{width:100%;padding:14px;font-size:17px;border-radius:10px;border:1px solid var(--line);background:var(--ink2);color:var(--paper)}
+.counts{display:flex;gap:10px;margin:12px 0}
+.counts div{flex:1;background:var(--ink2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.counts b{display:block;font-size:22px}.counts span{font-size:12px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase}
+.bar{height:6px;background:var(--line);border-radius:3px;margin-top:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--gold)}
+.row{display:flex;gap:10px;margin:12px 0}
+button{font-size:17px;font-weight:600;padding:14px 16px;border-radius:10px;border:0;cursor:pointer;background:var(--gold);color:var(--ink)}
+button.sec{background:var(--ink2);color:var(--paper);border:1px solid var(--line)}
+button.small{font-size:15px;padding:10px 14px}
+#cam{position:relative;margin:12px 0;border-radius:12px;overflow:hidden;background:#000}
+#cam video{width:100%;display:block;max-height:46vh;object-fit:cover}
+#cam .frame{position:absolute;inset:18% 18%;border:3px solid var(--gold);border-radius:14px;pointer-events:none}
+.hint{font-size:13px;color:var(--mut);margin:6px 2px}
+#result{margin:12px 0}
+.card{border-radius:14px;padding:18px;text-align:center}
+.card.ok{background:var(--ok)}.card.already{background:var(--warn);color:#fff}.card.bad{background:var(--bad)}
+.card h2{margin:0 0 4px;font-size:26px}.card p{margin:4px 0;font-size:17px}
+.tag{display:inline-block;font-weight:700;border-radius:20px;padding:4px 12px;font-size:15px;margin:6px 4px 0;background:rgba(255,255,255,.2)}
+.tag.dinner{background:var(--gold);color:var(--ink)}
+.card .acts{margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.card .acts button{background:#fff;color:var(--ink)}
+.item{display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--line)}
+.item .main{flex:1;min-width:0}.item .nm{font-weight:600;font-size:17px;overflow-wrap:anywhere}
+.item .sub{font-size:12.5px;color:var(--mut);font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+.item.in .nm{color:var(--mut)}
+.st{font-size:13px;color:var(--ok);font-weight:600}
+.badge{font-size:11px;font-weight:700;border-radius:12px;padding:2px 8px;background:var(--gold);color:var(--ink);margin-left:6px;vertical-align:middle}
+.empty{padding:30px;text-align:center;color:var(--mut)}
+</style>
+</head>
+<body>
+<div class="top"><b>Door check-in</b><a href="/admin/events.html">Back to admin</a></div>
+<div class="wrap">
+  <select id="ev" aria-label="Event"></select>
+  <div class="counts" id="counts"></div>
+  <div class="row"><button id="camBtn" onclick="toggleCam()">Scan with camera</button><button class="sec" onclick="loadAttendees()">Refresh</button></div>
+  <div id="cam" hidden><video id="vid" playsinline muted></video><div class="frame"></div></div>
+  <div class="hint" id="camHint"></div>
+  <input id="q" type="search" placeholder="Search name, email, phone or ticket code" autocomplete="off" oninput="renderList()" onkeydown="if(event.key==='Enter')searchEnter()" />
+  <div id="result"></div>
+  <div id="list"></div>
+</div>
+<script>
+var API = 'https://the2sellers-api.onrender.com';
+var token = localStorage.getItem('t2s_admin_token');
+var events = [], curEv = null, data = null, stream = null, detector = null, camTimer = null, lastScan = { code: '', at: 0 };
+function $(id) { return document.getElementById(id); }
+function esc(s) { if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function goLogin() { location.href = '/admin/index.html'; }
+if (!token) { goLogin(); }
+async function api(method, path, body) {
+  var o = { method: method, headers: { 'Authorization': 'Bearer ' + token } };
+  if (body) { o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(body); }
+  var r = await fetch(API + path, o);
+  if (r.status === 401) { goLogin(); throw new Error('login'); }
+  var d = {}; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(d.error || 'Something went wrong');
+  return d;
+}
+function tm(iso) { try { return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } }
+function buzz(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+
+async function loadEvents() {
+  try {
+    events = await api('GET', '/api/admin/checkin/events');
+    if (!events.length) { $('ev').innerHTML = '<option>No events yet</option>'; $('list').innerHTML = '<div class="empty">No events are open for check-in.</div>'; return; }
+    $('ev').innerHTML = events.map(function (e) {
+      var d = ''; try { d = e.starts_at ? new Date(e.starts_at).toLocaleDateString([], { timeZone: e.timezone || undefined, weekday: 'short', day: 'numeric', month: 'short' }) : ''; } catch (x) {}
+      return '<option value="' + e.id + '">' + esc(e.city) + (d ? ', ' + esc(d) : '') + ' (' + e.arrived + '/' + e.total + ')</option>';
+    }).join('');
+    $('ev').onchange = function () { curEv = parseInt($('ev').value, 10); data = null; $('result').innerHTML = ''; $('q').value = ''; loadAttendees(); };
+    curEv = events[0].id; $('ev').value = String(curEv);
+    await loadAttendees();
+  } catch (e) { if (e.message !== 'login') $('list').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+}
+
+async function loadAttendees() {
+  if (!curEv) return;
+  var asked = curEv;
+  try { var got = await api('GET', '/api/admin/checkin/events/' + asked + '/attendees'); if (asked !== curEv) return; data = got; renderCounts(); renderList(); }
+  catch (e) { if (e.message !== 'login') $('list').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+}
+
+function renderCounts() {
+  var c = data.counts, pct = c.total ? Math.round(c.arrived * 100 / c.total) : 0;
+  $('counts').innerHTML = '<div><span>Arrived</span><b>' + c.arrived + ' / ' + c.total + '</b><div class="bar"><i style="width:' + pct + '%"></i></div></div>' +
+    (c.dinner_total ? '<div><span>Dinner</span><b>' + c.dinner_arrived + ' / ' + c.dinner_total + '</b></div>' : '');
+}
+
+function matches(t, q) {
+  if (!q) return true;
+  var s = q.toLowerCase(), digits = q.replace(/[^0-9]/g, '');
+  return String(t.holder_name || '').toLowerCase().indexOf(s) >= 0 || String(t.buyer_email || '').toLowerCase().indexOf(s) >= 0 ||
+    String(t.code || '').toLowerCase().indexOf(s) >= 0 || (digits.length >= 4 && String(t.buyer_phone || '').replace(/[^0-9]/g, '').indexOf(digits) >= 0);
+}
+
+function renderList() {
+  if (!data) return;
+  var q = $('q').value.trim();
+  var rows = data.tickets.filter(function (t) { return matches(t, q); });
+  if (!rows.length) { $('list').innerHTML = '<div class="empty">' + (q ? 'Nobody matches "' + esc(q) + '".' : 'No tickets sold yet.') + '</div>'; return; }
+  $('list').innerHTML = rows.map(function (t) {
+    return '<div class="item' + (t.checked_in_at ? ' in' : '') + '"><div class="main"><div class="nm">' + esc(t.holder_name) + (t.has_dinner ? '<span class="badge">DINNER</span>' : '') + '</div><div class="sub">' + esc(t.code) + (t.qty > 1 ? ' · booking of ' + t.qty : '') + '</div>' +
+      (t.checked_in_at ? '<div class="st">Arrived ' + esc(tm(t.checked_in_at)) + '</div>' : '') + '</div>' +
+      (t.checked_in_at ? '<button class="sec small" data-act="undo" data-code="' + esc(t.code) + '">Undo</button>' : '<button class="small" data-act="in" data-code="' + esc(t.code) + '">Check in</button>') + '</div>';
+  }).join('');
+}
+
+document.addEventListener('click', function (e) {
+  var b = e.target.closest ? e.target.closest('[data-act]') : null;
+  if (!b) return;
+  var a = b.getAttribute('data-act'), code = b.getAttribute('data-code');
+  if (a === 'in') scanCode(code);
+  else if (a === 'undo') undoCode(code);
+  else if (a === 'party') checkInParty(parseInt(b.getAttribute('data-order'), 10));
+});
+
+function searchEnter() {
+  var q = $('q').value.trim();
+  if (/T2S[A-Za-z0-9]{10}/i.test(q)) { scanCode(q); $('q').value = ''; renderList(); return; }
+  if (data) { var rows = data.tickets.filter(function (t) { return matches(t, q); }); if (rows.length === 1 && !rows[0].checked_in_at) scanCode(rows[0].code); }
+}
+
+function showResult(r) {
+  var html = '';
+  var name = esc(r.holder_name || '');
+  if (r.result === 'ok') {
+    html = '<div class="card ok"><h2>Welcome, ' + name + '</h2>' + (r.has_dinner ? '<span class="tag dinner">DINNER INCLUDED</span>' : '<span class="tag">No dinner</span>');
+    if (r.party && r.party.total > 1) {
+      html += '<p>' + r.party.arrived + ' of ' + r.party.total + ' in this booking have arrived</p>';
+      if (r.party.arrived < r.party.total) html += '<div class="acts"><button data-act="party" data-order="' + r.order_id + '">Check in the other ' + (r.party.total - r.party.arrived) + '</button></div>';
+    }
+    html += '</div>'; buzz(80);
+  } else if (r.result === 'already') {
+    html = '<div class="card already"><h2>Already checked in</h2><p>' + name + ' arrived at ' + esc(tm(r.checked_in_at)) + '</p>' + (r.has_dinner ? '<span class="tag dinner">DINNER INCLUDED</span>' : '') +
+      '<div class="acts"><button data-act="undo" data-code="' + esc(r.code) + '">Undo check-in</button></div></div>'; buzz([60, 60, 60]);
+  } else {
+    html = '<div class="card bad"><h2>' + (r.result === 'wrong_event' ? 'Wrong event' : 'Not valid') + '</h2><p>' + esc(r.message || 'This ticket cannot be used.') + '</p>' + (name ? '<p>' + name + '</p>' : '') + '</div>'; buzz([200, 80, 200]);
+  }
+  $('result').innerHTML = html;
+}
+
+async function scanCode(code) {
+  try { var r = await api('POST', '/api/admin/checkin/scan', { code: code, event_id: curEv }); showResult(r); if (r.result === 'ok' || r.result === 'already') loadAttendees(); }
+  catch (e) { if (e.message !== 'login') showResult({ result: 'invalid', message: e.message }); }
+}
+async function undoCode(code) {
+  try { await api('POST', '/api/admin/checkin/undo', { code: code }); $('result').innerHTML = '<div class="card already"><h2>Check-in undone</h2></div>'; loadAttendees(); }
+  catch (e) { if (e.message !== 'login') showResult({ result: 'invalid', message: e.message }); }
+}
+async function checkInParty(orderId) {
+  try { var r = await api('POST', '/api/admin/checkin/order', { order_id: orderId }); $('result').innerHTML = '<div class="card ok"><h2>Whole booking checked in</h2><p>' + r.party.arrived + ' of ' + r.party.total + ' arrived</p></div>'; buzz(80); loadAttendees(); }
+  catch (e) { if (e.message !== 'login') showResult({ result: 'invalid', message: e.message }); }
+}
+
+// ---- camera scanning ----
+function loadJsQR() {
+  return new Promise(function (res, rej) {
+    if (window.jsQR) return res();
+    var s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+    s.onload = function () { res(); }; s.onerror = function () { rej(new Error('Could not load the scanner')); };
+    document.head.appendChild(s);
+  });
+}
+async function toggleCam() {
+  if (stream) { stopCam(); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $('camHint').textContent = 'This browser cannot use the camera here. Use the search box instead.'; return; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    $('vid').srcObject = stream; await $('vid').play(); $('cam').hidden = false; $('camBtn').textContent = 'Stop camera'; $('camHint').textContent = 'Point the camera at the QR code on the ticket.';
+    if ('BarcodeDetector' in window) detector = new window.BarcodeDetector({ formats: ['qr_code'] }); else await loadJsQR();
+    camTimer = setInterval(scanFrame, 300);
+  } catch (e) { stopCam(); $('camHint').textContent = 'Camera not available (' + (e.message || 'permission denied') + '). Use the search box instead.'; }
+}
+function stopCam() {
+  if (camTimer) clearInterval(camTimer); camTimer = null;
+  if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); } stream = null; detector = null;
+  $('cam').hidden = true; $('camBtn').textContent = 'Scan with camera';
+}
+async function scanFrame() {
+  var v = $('vid'); if (!v || !v.videoWidth) return;
+  var text = null;
+  try {
+    if (detector) { var f = await detector.detect(v); if (f && f.length) text = f[0].rawValue; }
+    else if (window.jsQR) { var c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; var x = c.getContext('2d'); x.drawImage(v, 0, 0); var im = x.getImageData(0, 0, c.width, c.height); var q = window.jsQR(im.data, c.width, c.height); if (q) text = q.data; }
+  } catch (e) { return; }
+  if (!text) return;
+  var now = Date.now();
+  if (text === lastScan.code && now - lastScan.at < 3500) return;   // do not re-read the same ticket straight away
+  lastScan = { code: text, at: now };
+  scanCode(text);
+}
+
+loadEvents();
+setInterval(function () { if (!document.hidden && curEv && !$('q').value) loadAttendees(); }, 20000);
+</script>
+</body>
+</html>
