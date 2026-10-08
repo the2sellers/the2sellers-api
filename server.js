@@ -366,11 +366,12 @@ app.post('/api/setup/create-first-admin', ah(async (req, res) => {
 
 app.post('/api/admin/login', ah(async (req, res) => {
     const { email, password } = req.body;
-    const { rows } = await pool.query('SELECT * FROM admin_users WHERE email = $1', [email]);
+    const { rows } = await pool.query('SELECT * FROM admin_users WHERE lower(email) = lower($1)', [String(email || '').trim()]);
     const user = rows[0];
     if (!user || !checkPassword(password, user.password_hash)) {
           return res.status(401).json({ error: 'Invalid email or password' });
     }
+    if (user.is_active === false) return res.status(403).json({ error: 'This account has been switched off. Please ask the administrator.' });
     res.json({ token: createToken(user), user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 }));
 
