@@ -645,7 +645,7 @@ app.delete('/api/admin/blog-posts/:id', requireAuth, requireAdmin, ah(async (req
 // EVENTS: ticketed seminars and online sessions
 // ============================================================
 
-const EVENT_TEXT_FIELDS = ['city', 'title', 'subline', 'venue', 'address', 'timezone', 'currency', 'price_note', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'banner_caption', 'intro_video_url', 'button_text', 'includes_text', 'starts_at', 'ends_at'];
+const EVENT_TEXT_FIELDS = ['confirmation_note', 'city', 'title', 'subline', 'venue', 'address', 'timezone', 'currency', 'price_note', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'banner_caption', 'intro_video_url', 'button_text', 'includes_text', 'starts_at', 'ends_at'];
 const EVENT_INT_FIELDS = ['ticket_price_cents', 'dinner_price_cents', 'dinner_capacity', 'capacity', 'min_attendance', 'refund_cutoff_days', 'banner_overlay'];
 const EVENT_REQUIRED = ['city', 'title', 'timezone', 'currency', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'button_text', 'ticket_price_cents', 'dinner_capacity', 'capacity', 'min_attendance', 'refund_cutoff_days', 'banner_overlay'];
 const EVENT_ENUMS = {
@@ -780,10 +780,30 @@ app.patch('/api/admin/events/:id', requireAuth, uploadBannerImage.single('image'
 }));
 
 app.delete('/api/admin/events/:id', requireAuth, requireAdmin, ah(async (req, res) => {
-  const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM orders WHERE event_id = $1', [req.params.id]);
-  if (rows[0].n > 0) return res.status(409).json({ error: 'This event has orders. Set it to cancelled instead of deleting it.' });
-  await pool.query('DELETE FROM events WHERE id = $1', [req.params.id]);
-  res.json({ ok: true });
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Event not specified' });
+  const found = await pool.query('SELECT id FROM events WHERE id = $1', [id]);
+  if (!found.rows[0]) return res.status(404).json({ error: 'Event not found' });
+  // Never delete an event while someone holds a live booking or is in the middle of paying.
+  const live = (await pool.query(
+    "SELECT COUNT(*) FILTER (WHERE status IN ('paid', 'needs_refund'))::int AS booked, " +
+    "COUNT(*) FILTER (WHERE status = 'pending' AND hold_expires_at > NOW())::int AS paying FROM orders WHERE event_id = $1", [id])).rows[0];
+  if (live.booked > 0) return res.status(409).json({ error: 'This event still has ' + live.booked + ' confirmed booking' + (live.booked === 1 ? '' : 's') + '. Use "Cancel event and refund everyone" first, then you can delete it.' });
+  if (live.paying > 0) return res.status(409).json({ error: 'Someone is paying for this event right now. Cancel the event, wait a few minutes, then delete it.' });
+  // What is left is only refunded, cancelled, expired or abandoned bookings. Remove them with the event.
+  const client = await pool.connect();
+  let removed = 0;
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM tickets WHERE event_id = $1', [id]);
+    removed = (await client.query('DELETE FROM orders WHERE event_id = $1', [id])).rowCount;
+    await client.query('DELETE FROM events WHERE id = $1', [id]);
+    await client.query('COMMIT');
+  } catch (e) {
+    try { await client.query('ROLLBACK'); } catch (e2) { /* ignore */ }
+    throw e;
+  } finally { client.release(); }
+  res.json({ ok: true, removed_bookings: removed });
 }));
 
 app.get('/api/admin/events/:id/attendees', requireAuth, ah(async (req, res) => {
