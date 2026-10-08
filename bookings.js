@@ -12,7 +12,7 @@ const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L, easy t
 const MAX_PER_ORDER = 10;
 const MAX_PER_EMAIL = 10;
 const PHONE_REQUIRED = process.env.PHONE_REQUIRED !== 'false';
-const WA_DEFAULT = 'Hi {name}, you are booked for {event} in {city}. When: {when}. Where: {where}. Your {count} ticket(s) with QR code: {link} See you there! Bilal, The2Sellers.io';
+const WA_DEFAULT = 'Hi {first_name}, you are booked for {event} in {city}.\n\nWhen: {when}\nWhere: {where}\nMap: {map}\n\nYour {count} ticket(s) with QR code: {link}\n{dinner}\n{note}\n\n{refund}\n\nQuestions? Just reply here. See you there! Bilal, The2Sellers.io';
 const CODE_RE = /^T2S[A-Z0-9]{10}$/;
 const TOKEN_RE = /^[A-Za-z0-9_-]{20,40}$/;
 
@@ -83,20 +83,73 @@ function placeText(ev) {
   return ev.is_online ? 'Live online' : [ev.venue, ev.address].filter(Boolean).join(', ');
 }
 
-function buildEmail(ev, name, token, codes) {
+// Everything a guest might want to know about the event, in one place. Used by the confirmation email,
+// the ticket page, the WhatsApp message and the Stripe checkout page.
+function mapUrl(ev) {
+  if (ev.is_online) return '';
+  const q = [ev.venue, ev.address, ev.city].filter(Boolean).join(', ');
+  return q ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q) : '';
+}
+function refundText(ev) {
+  const d = parseInt(ev.refund_cutoff_days, 10) || 0;
+  return d > 0
+    ? 'Refunds: full refund if you cancel at least ' + d + ' day' + (d === 1 ? '' : 's') + ' before the event. Just reply to your confirmation email.'
+    : 'Refunds: if you cannot attend, reply to your confirmation email and we will look at it.';
+}
+function calendarUrl(ev) {
+  if (!ev.starts_at) return '';
+  const fmt = function (d) { return new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); };
+  const start = new Date(ev.starts_at);
+  const end = ev.ends_at ? new Date(ev.ends_at) : new Date(start.getTime() + 2 * 3600 * 1000);
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(ev.title) + '&dates=' + fmt(start) + '/' + fmt(end) +
+    '&location=' + encodeURIComponent(placeText(ev)) + '&details=' + encodeURIComponent(ev.title + ' with The2Sellers.io');
+}
+function eventInfo(ev) {
+  return { when: whenText(ev), place: placeText(ev), map: mapUrl(ev), refund: refundText(ev), calendar: calendarUrl(ev),
+    note: String(ev.confirmation_note || '').trim(), includes: String(ev.includes_text || '').trim(), timezone: ev.timezone || '' };
+}
+
+function buildEmail(ev, name, token, codes, extra) {
+  extra = extra || {};
+  const info = eventInfo(ev);
   const link = TICKET_PAGE_URL + '?t=' + encodeURIComponent(token);
+  const dinnerCount = codes.filter(function (c) { return c.has_dinner; }).length;
   const rows = codes.map(function (c) {
-    return '<tr><td style="padding:12px 0;border-top:1px solid #e7e3d8"><div style="font-family:monospace;font-size:16px;letter-spacing:1px;margin-bottom:8px">' + esc(c.code) + (c.has_dinner ? ' &nbsp;·&nbsp; includes dinner' : '') + '</div><img src="' + API_PUBLIC_URL + '/api/public/tickets/' + c.code + '/qr.png" width="160" height="160" alt="QR code for ' + esc(c.code) + '"></td></tr>';
+    return '<tr><td style="padding:12px 0;border-top:1px solid #e7e3d8"><div style="font-family:monospace;font-size:16px;letter-spacing:1px;margin-bottom:8px">' + esc(c.code) + (c.has_dinner ? ' &nbsp;·&nbsp; includes dinner' : '') + '</div><img src="' + API_PUBLIC_URL + '/api/public/tickets/' + c.code + '/qr.png" width="180" height="180" alt="QR code for ticket ' + esc(c.code) + '" style="display:block"></td></tr>';
   }).join('');
+  const detail = function (label, value) {
+    return value ? '<tr><td style="padding:6px 12px 6px 0;color:#5B5D63;vertical-align:top;width:92px">' + label + '</td><td style="padding:6px 0">' + value + '</td></tr>' : '';
+  };
+  const summary = [
+    detail('Tickets', String(codes.length)),
+    dinnerCount ? detail('Dinner', dinnerCount + ' seat' + (dinnerCount === 1 ? '' : 's')) : '',
+    extra.paidText ? detail('Paid', esc(extra.paidText)) : detail('Price', 'Free'),
+    extra.orderId ? detail('Reference', '#' + esc(extra.orderId)) : ''
+  ].join('');
   const html = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0F0F12">' +
     '<h2 style="font-family:Georgia,serif;font-weight:normal">You are booked in, ' + esc(name) + '.</h2>' +
-    '<p><strong>' + esc(ev.title) + '</strong><br>' + esc(whenText(ev)) + '<br>' + esc(placeText(ev)) + '</p>' +
-    '<p>Show the QR code below at the door. You can also open your tickets any time:</p>' +
-    '<p><a href="' + esc(link) + '" style="background:#E8B939;color:#0F0F12;padding:12px 20px;border-radius:4px;text-decoration:none;font-weight:bold">Open my tickets</a></p>' +
+    '<div style="background:#FAFAF7;border:1px solid #e7e3d8;border-radius:8px;padding:16px 18px;margin:0 0 18px">' +
+      '<div style="font-size:18px;font-weight:bold;margin-bottom:8px">' + esc(ev.title) + '</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:15px">' +
+        detail('When', esc(info.when) + (info.timezone ? '<br><span style="color:#5B5D63;font-size:13px">Time zone: ' + esc(info.timezone) + '</span>' : '')) +
+        detail('Where', esc(info.place) + (info.map ? '<br><a href="' + esc(info.map) + '" style="color:#7A5C0A">Open in Google Maps</a>' : '')) +
+        detail('Includes', esc(info.includes)) +
+      '</table></div>' +
+    (info.note ? '<div style="background:#FFF6DC;border-left:4px solid #E8B939;padding:14px 16px;margin:0 0 18px;white-space:pre-line"><strong>A note from your host</strong><br>' + esc(info.note) + '</div>' : '') +
+    '<h3 style="margin:18px 0 6px;font-size:16px">Your booking</h3>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:15px">' + summary + '</table>' +
+    '<p style="margin:18px 0 8px">Show the QR code below at the door. You can also open your tickets any time:</p>' +
+    '<p><a href="' + esc(link) + '" style="background:#E8B939;color:#0F0F12;padding:12px 20px;border-radius:4px;text-decoration:none;font-weight:bold">Open my tickets</a>' +
+      (info.calendar ? ' &nbsp; <a href="' + esc(info.calendar) + '" style="color:#7A5C0A;font-weight:bold">Add to calendar</a>' : '') + '</p>' +
     '<table style="width:100%;border-collapse:collapse">' + rows + '</table>' +
-    '<p style="color:#5B5D63;font-size:13px;margin-top:24px">Questions? Reply to this email or write to contact@the2sellers.io.</p></div>';
-  const text = 'You are booked in, ' + name + '.\n\n' + ev.title + '\n' + whenText(ev) + '\n' + placeText(ev) + '\n\nYour tickets: ' + link + '\n\n' +
-    codes.map(function (c) { return 'Ticket ' + c.code + (c.has_dinner ? ' (includes dinner)' : ''); }).join('\n') + '\n';
+    '<p style="color:#5B5D63;font-size:13px;margin-top:24px">' + esc(info.refund) + '</p>' +
+    '<p style="color:#5B5D63;font-size:13px">Questions? Reply to this email or write to contact@the2sellers.io.</p></div>';
+  const text = 'You are booked in, ' + name + '.\n\n' + ev.title + '\nWhen: ' + info.when + (info.timezone ? ' (' + info.timezone + ')' : '') + '\nWhere: ' + info.place +
+    (info.map ? '\nMap: ' + info.map : '') + (info.includes ? '\nIncludes: ' + info.includes : '') + '\n' +
+    (info.note ? '\nA note from your host:\n' + info.note + '\n' : '') +
+    '\nYour booking: ' + codes.length + ' ticket' + (codes.length === 1 ? '' : 's') + (dinnerCount ? ', ' + dinnerCount + ' with dinner' : '') + '. ' + (extra.paidText ? 'Paid: ' + extra.paidText + '.' : 'Free.') + (extra.orderId ? ' Reference #' + extra.orderId + '.' : '') + '\n' +
+    'Your tickets: ' + link + '\n' + (info.calendar ? 'Add to calendar: ' + info.calendar + '\n' : '') + '\n' +
+    codes.map(function (c) { return 'Ticket ' + c.code + (c.has_dinner ? ' (includes dinner)' : ''); }).join('\n') + '\n\n' + info.refund + '\nQuestions? Reply to this email or write to contact@the2sellers.io.\n';
   return { html: html, text: text };
 }
 
@@ -104,7 +157,7 @@ function buildEmail(ev, name, token, codes) {
 async function afterBooking(pool, ev, name, email, token, codes, orderId, paidText) {
   let status = 'skipped';
   try {
-    const m = buildEmail(ev, name, token, codes);
+    const m = buildEmail(ev, name, token, codes, { orderId: orderId, paidText: paidText });
     const r = await sendMail({ to: email, subject: 'Your ticket: ' + ev.title, html: m.html, text: m.text });
     status = r.ok ? 'sent' : (r.skipped ? 'skipped' : 'failed:' + (r.status || r.error || 'unknown'));
   } catch (e) { status = 'failed'; }
@@ -201,7 +254,7 @@ module.exports = function mountBookings(app, pool) {
     await ensureSchema(pool);
     if (!TOKEN_RE.test(req.params.token)) return res.status(404).json({ error: 'Not found' });
     const { rows } = await pool.query(
-      'SELECT o.id, o.buyer_name, o.buyer_email, o.status, e.title, e.city, e.venue, e.address, e.starts_at, e.ends_at, e.timezone, e.is_online, e.status AS event_status ' +
+      'SELECT o.id, o.buyer_name, o.buyer_email, o.status, e.title, e.city, e.venue, e.address, e.starts_at, e.ends_at, e.timezone, e.is_online, e.status AS event_status, e.refund_cutoff_days, e.confirmation_note, e.includes_text ' +
       'FROM orders o JOIN events e ON e.id = o.event_id WHERE o.public_token = $1', [req.params.token]);
     const o = rows[0];
     if (!o) return res.status(404).json({ error: 'Not found' });
@@ -210,7 +263,7 @@ module.exports = function mountBookings(app, pool) {
     const masked = em.length > 3 ? em.charAt(0) + '***' + em.slice(em.indexOf('@')) : '';
     res.json({
       status: o.status, buyer_name: o.buyer_name, email: masked,
-      event: { title: o.title, city: o.city, venue: o.venue, address: o.address, starts_at: o.starts_at, ends_at: o.ends_at, timezone: o.timezone, is_online: o.is_online, status: o.event_status },
+      event: { title: o.title, city: o.city, venue: o.venue, address: o.address, starts_at: o.starts_at, ends_at: o.ends_at, timezone: o.timezone, is_online: o.is_online, status: o.event_status, map_url: mapUrl(o), note: String(o.confirmation_note || '').trim(), refund_text: refundText(o), includes: String(o.includes_text || '').trim() },
       tickets: t.rows.map(function (r) { return { code: r.code, has_dinner: r.has_dinner, checked_in: !!r.checked_in_at }; })
     });
   }));
@@ -218,7 +271,7 @@ module.exports = function mountBookings(app, pool) {
   // ---- Admin: everything about the bookings for one event (for the attendee list, CSV and WhatsApp) ----
   app.get('/api/admin/events/:id/bookings', requireAuth, ah(async function (req, res) {
     await ensureSchema(pool);
-    const er = await pool.query('SELECT id, title, city, venue, address, starts_at, ends_at, timezone, is_online, currency FROM events WHERE id = $1', [req.params.id]);
+    const er = await pool.query('SELECT id, title, city, venue, address, starts_at, ends_at, timezone, is_online, currency, refund_cutoff_days, confirmation_note, includes_text FROM events WHERE id = $1', [req.params.id]);
     const ev = er.rows[0];
     if (!ev) return res.status(404).json({ error: 'Event not found' });
     const orders = (await pool.query(
@@ -227,7 +280,7 @@ module.exports = function mountBookings(app, pool) {
     const byOrder = {};
     tickets.forEach(function (t) { (byOrder[t.order_id] = byOrder[t.order_id] || []).push({ code: t.code, has_dinner: t.has_dinner, checked_in: !!t.checked_in_at }); });
     res.json({
-      event: { id: ev.id, title: ev.title, city: ev.city, when_text: whenText(ev), place_text: placeText(ev), currency: ev.currency },
+      event: { id: ev.id, title: ev.title, city: ev.city, when_text: whenText(ev), place_text: placeText(ev), currency: ev.currency, address: ev.address || '', map_url: mapUrl(ev), note: String(ev.confirmation_note || '').trim(), refund_text: refundText(ev), calendar_url: calendarUrl(ev), includes: String(ev.includes_text || '').trim() },
       orders: orders.map(function (o) {
         return {
           id: o.id, created_at: o.created_at, name: o.buyer_name, email: o.buyer_email, phone: o.buyer_phone, whatsapp_ok: o.whatsapp_ok,
@@ -280,5 +333,5 @@ module.exports = function mountBookings(app, pool) {
   });
 
   // Stripe checkout, webhook, confirmation and refunds
-  require('./payments')(app, pool, { ensureSchema: ensureSchema, newCode: newCode, afterBooking: afterBooking, limited: limited, cleanPhone: cleanPhone, ah: ah, TICKET_PAGE_URL: TICKET_PAGE_URL, MAX_PER_ORDER: MAX_PER_ORDER, MAX_PER_EMAIL: MAX_PER_EMAIL });
+  require('./payments')(app, pool, { ensureSchema: ensureSchema, newCode: newCode, afterBooking: afterBooking, limited: limited, cleanPhone: cleanPhone, ah: ah, eventInfo: eventInfo, TICKET_PAGE_URL: TICKET_PAGE_URL, MAX_PER_ORDER: MAX_PER_ORDER, MAX_PER_EMAIL: MAX_PER_EMAIL });
 };
