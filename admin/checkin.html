@@ -43,7 +43,7 @@ button.small{font-size:15px;padding:10px 14px}
 </style>
 </head>
 <body>
-<div class="top"><b>Door check-in</b><a href="/admin/events.html">Back to admin</a></div>
+<div class="top"><b>Door check-in</b><a id="topLink" href="/admin/events.html">Back to admin</a></div>
 <div class="wrap">
   <select id="ev" aria-label="Event"></select>
   <div class="counts" id="counts"></div>
@@ -60,8 +60,10 @@ var token = localStorage.getItem('t2s_admin_token');
 var events = [], curEv = null, data = null, stream = null, detector = null, camTimer = null, lastScan = { code: '', at: 0 };
 function $(id) { return document.getElementById(id); }
 function esc(s) { if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
-function goLogin() { location.href = '/admin/index.html'; }
+function goLogin() { localStorage.removeItem('t2s_admin_token'); localStorage.removeItem('t2s_admin_user'); location.href = '/admin/login.html'; }
 if (!token) { goLogin(); }
+var me = null; try { me = JSON.parse(localStorage.getItem('t2s_admin_user') || 'null'); } catch (e) {}
+if (me && me.role === 'door') { var tl = $('topLink'); tl.textContent = 'Log out (' + me.name + ')'; tl.href = '#'; tl.addEventListener('click', function (ev) { ev.preventDefault(); goLogin(); }); }
 async function api(method, path, body) {
   var o = { method: method, headers: { 'Authorization': 'Bearer ' + token } };
   if (body) { o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(body); }
