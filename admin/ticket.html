@@ -35,6 +35,8 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,5vw,44px);lin
 .state{padding:80px 0;text-align:center}
 @media(max-width:560px){.tk{grid-template-columns:1fr;text-align:center}.tk img{margin:0 auto}}
 @media print{body{background:#fff;color:#000}.top,.row,.noprint{display:none}.tk{border:1px solid #999;break-inside:avoid}.mut,.info b{color:#444}}
+.note{background:#17171B;border-left:4px solid #E8B939;border-radius:6px;padding:14px 16px;margin:0 0 18px;white-space:pre-line;font-size:15px}
+.info small{color:#B9B9BE}.info a{color:#E8B939}
 </style>
 </head>
 <body>
@@ -96,9 +98,10 @@ async function load(){
     }).join('');
     document.title = 'Your tickets | ' + ev.title;
     show('<div class="eb">You are booked in</div><h1>' + esc(ev.title) + '</h1>' +
-      '<div class="info"><div><b>When</b><span>' + esc(when(ev.starts_at, ev.ends_at, ev.timezone)) + '</span></div><div><b>Where</b><span>' + esc(place || 'To be announced') + '</span></div></div>' +
+      '<div class="info"><div><b>When</b><span>' + esc(when(ev.starts_at, ev.ends_at, ev.timezone)) + (ev.timezone ? '<br><small>Time zone: ' + esc(ev.timezone) + '</small>' : '') + '</span></div><div><b>Where</b><span>' + esc(place || 'To be announced') + (ev.map_url ? '<br><a href="' + esc(ev.map_url) + '" target="_blank" rel="noopener">Open in Google Maps</a>' : '') + '</span></div>' + (ev.includes ? '<div><b>Includes</b><span>' + esc(ev.includes) + '</span></div>' : '') + '</div>' +
+      (ev.note ? '<div class="note"><b>A note from your host</b><br>' + esc(ev.note) + '</div>' : '') +
       '<div class="row">' + (cal ? '<a class="btn" href="' + esc(cal) + '" target="_blank" rel="noopener">Add to calendar</a>' : '') + '<button class="btn2" onclick="window.print()">Print tickets</button></div>' +
-      tickets + '<p class="mut noprint" style="font-size:14px">Show the QR code at the door. Keep this page, or the email we sent you, safe. Anyone with this link can see these tickets.</p>');
+      tickets + (ev.refund_text ? '<p class="mut noprint" style="font-size:14px">' + esc(ev.refund_text) + '</p>' : '') + '<p class="mut noprint" style="font-size:14px">Show the QR code at the door. Keep this page, or the email we sent you, safe. Anyone with this link can see these tickets.</p>');
   } catch (e) { problem('Something went wrong. Please try again.'); }
 }
 load();
