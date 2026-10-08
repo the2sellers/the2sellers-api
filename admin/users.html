@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+<title>Team logins | The2Sellers.io Admin</title>
+<link rel="stylesheet" href="/admin/style.css" />
+<style>
+  .wrap{max-width:900px;margin:0 auto;padding:28px 20px 80px}
+  h1{font-family:'Fraunces',Georgia,serif;font-weight:400;margin:0 0 6px}
+  .lead{color:#5B5D63;margin:0 0 22px}
+  .card{background:#fff;border:1px solid #E7E3D8;border-radius:10px;padding:20px;margin-bottom:22px}
+  .card h2{margin:0 0 12px;font-size:18px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  label{display:block;font-size:13px;font-weight:600;margin:0 0 4px}
+  input[type=text],select{width:100%;padding:10px 12px;border:1px solid #D8D3C4;border-radius:6px;font-size:15px;box-sizing:border-box;background:#fff}
+  .hint{font-size:12px;color:#7A7C82;margin-top:4px}
+  .btn-primary{background:#0F0F12;color:#FAFAF7;border:none;border-radius:6px;padding:10px 18px;cursor:pointer;font-size:14px}
+  .btn-secondary{background:none;border:1px solid #D8D3C4;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px}
+  .btn-danger{background:none;border:1px solid #E0C7C9;color:#B3261E;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #E7E3D8;vertical-align:middle}
+  th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#7A7C82}
+  .chip{display:inline-block;font-size:11px;font-weight:700;border-radius:12px;padding:2px 9px;background:#F2EFE6}
+  .chip.door{background:#E8B939;color:#0F0F12}.chip.admin{background:#0F0F12;color:#fff}
+  .off{color:#B3261E;font-weight:600}.on{color:#1F6B3F;font-weight:600}
+  .acts{display:flex;gap:6px;flex-wrap:wrap}
+  .made{background:#FFF6DC;border-left:4px solid #E8B939;border-radius:6px;padding:14px 16px;margin-top:16px;font-size:14px;line-height:1.6}
+  .made code{background:#fff;padding:2px 6px;border-radius:4px;font-size:14px}
+  .msg-err{background:#FBEAEA;color:#6B1E23;border:1px solid #E0C7C9;border-radius:6px;padding:10px 12px;margin:12px 0;font-size:14px}
+  @media(max-width:640px){.grid{grid-template-columns:1fr}.hide-sm{display:none}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/admin/index.html" style="font-weight:700;text-decoration:none;color:inherit">The2Sellers.<span style="color:#E8B939">io</span> — Admin</a>
+  <nav><a href="/admin/events.html">Events</a><a href="/admin/users.html" class="active">Team</a></nav>
+</div>
+<div class="wrap">
+  <h1>Team logins</h1>
+  <p class="lead">Give each official their own username and password. <strong>Door staff</strong> can only open the check-in screen and scan tickets. They cannot see bookings, emails, prices or refunds. You can switch any login off instantly.</p>
+  <div id="err"></div>
+  <div class="card">
+    <h2>Create a login</h2>
+    <div class="grid">
+      <div><label for="u_name">Name</label><input type="text" id="u_name" placeholder="Sam, front door" autocomplete="off" /></div>
+      <div><label for="u_login">Username</label><input type="text" id="u_login" placeholder="door1" autocomplete="off" autocapitalize="none" /><div class="hint">Letters and numbers only, no spaces. An email address also works.</div></div>
+      <div><label for="u_pass">Password</label><input type="text" id="u_pass" placeholder="At least 8 characters" autocomplete="off" /><div class="hint"><a href="#" id="genPass">Make a password for me</a></div></div>
+      <div><label for="u_role">Can do</label><select id="u_role"><option value="door">Door staff: check-in screen only</option><option value="reviewer">Reviewer: review listings and inquiries</option><option value="admin">Administrator: everything, including this page</option></select></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn-primary" id="createBtn">Create login</button></div>
+    <div id="made"></div>
+  </div>
+  <div class="card">
+    <h2>Current logins</h2>
+    <div id="list"><p class="hint">Loading…</p></div>
+  </div>
+</div>
+<script>
+var API = 'https://the2sellers-api.onrender.com';
+var token = localStorage.getItem('t2s_admin_token');
+var me = null; try { me = JSON.parse(localStorage.getItem('t2s_admin_user') || 'null'); } catch (e) {}
+var users = [];
+function $(id) { return document.getElementById(id); }
+function esc(s) { if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function goLogin() { localStorage.removeItem('t2s_admin_token'); localStorage.removeItem('t2s_admin_user'); location.href = '/admin/login.html'; }
+if (!token) { goLogin(); }
+async function api(method, path, body) {
+  var o = { method: method, headers: { 'Authorization': 'Bearer ' + token } };
+  if (body) { o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(body); }
+  var r = await fetch(API + path, o);
+  if (r.status === 401) { goLogin(); throw new Error('login'); }
+  var d = {}; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(d.error || 'Something went wrong.');
+  return d;
+}
+function showErr(m) { $('err').innerHTML = m ? '<div class="msg-err">' + esc(m) + '</div>' : ''; if (m) window.scrollTo(0, 0); }
+var ROLE_LABEL = { door: 'Door staff', reviewer: 'Reviewer', admin: 'Administrator' };
+
+// A clear on-page confirmation box, with an optional text field (used for new passwords).
+function ask(o) {
+  return new Promise(function (resolve) {
+    var wrap = document.createElement('div'); wrap.id = 'askBox';
+    wrap.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,15,18,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px';
+    wrap.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fff;border-radius:12px;max-width:440px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.35)"><h3 style="margin:0 0 10px;font-size:20px">' + esc(o.title) + '</h3><div style="font-size:15px;line-height:1.5;color:#33333A;white-space:pre-line">' + esc(o.body || '') + '</div>' +
+      (o.input ? '<div style="margin-top:12px"><input type="text" id="askInput" autocomplete="off" style="width:100%;padding:10px 12px;border:1px solid #D8D3C4;border-radius:6px;font-size:15px;box-sizing:border-box" placeholder="' + esc(o.input) + '"><div class="hint"><a href="#" id="askGen">Make a password for me</a></div></div>' : '') +
+      '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px"><button type="button" id="askNo" class="btn-secondary">' + (o.no || 'Keep it') + '</button><button type="button" id="askYes" style="background:' + (o.danger === false ? '#0F0F12' : '#B3261E') + ';color:#fff;border:0;border-radius:6px;padding:10px 18px;font-weight:600;cursor:pointer">' + esc(o.yes || 'Yes') + '</button></div></div>';
+    document.body.appendChild(wrap);
+    var inp = wrap.querySelector('#askInput');
+    function onKey(e) { if (e.key === 'Escape') done(null); }
+    function done(v) { document.removeEventListener('keydown', onKey); wrap.remove(); resolve(v); }
+    document.addEventListener('keydown', onKey);
+    wrap.addEventListener('click', function (e) { if (e.target === wrap) done(null); });
+    wrap.querySelector('#askNo').addEventListener('click', function () { done(null); });
+    wrap.querySelector('#askYes').addEventListener('click', function () { done(inp ? inp.value : true); });
+    var g = wrap.querySelector('#askGen'); if (g) g.addEventListener('click', function (e) { e.preventDefault(); inp.value = makePassword(); });
+    (inp || wrap.querySelector('#askNo')).focus();
+  });
+}
+
+function makePassword() {
+  var words = ['river', 'amber', 'falcon', 'maple', 'cobalt', 'harbor', 'tiger', 'orchid', 'silver', 'ember', 'linen', 'coral', 'pepper', 'summit', 'lotus', 'anchor'];
+  var buf = new Uint32Array(3); (window.crypto || window.msCrypto).getRandomValues(buf);
+  function cap(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
+  return cap(words[buf[0] % words.length]) + '-' + cap(words[buf[1] % words.length]) + '-' + (100 + buf[2] % 900);
+}
+
+async function load() {
+  try { users = await api('GET', '/api/admin/users'); render(); }
+  catch (e) { if (e.message === 'login') return; $('list').innerHTML = '<p class="hint">' + esc(/Admin role/.test(e.message) ? 'Only administrators can manage logins.' : e.message) + '</p>'; }
+}
+
+function render() {
+  if (!users.length) { $('list').innerHTML = '<p class="hint">No logins yet.</p>'; return; }
+  $('list').innerHTML = '<table><thead><tr><th>Name</th><th>Username</th><th>Can do</th><th>Status</th><th></th></tr></thead><tbody>' + users.map(function (u) {
+    var self = me && me.id === u.id;
+    return '<tr><td>' + esc(u.name) + (self ? ' <span class="hint">(you)</span>' : '') + '</td><td>' + esc(u.email) + '</td><td><span class="chip ' + esc(u.role) + '">' + esc(ROLE_LABEL[u.role] || u.role) + '</span></td>' +
+      '<td>' + (u.is_active ? '<span class="on">Active</span>' : '<span class="off">Switched off</span>') + '</td><td><div class="acts">' +
+      '<button class="btn-secondary" data-act="pw" data-id="' + u.id + '">New password</button>' +
+      (self ? '' : '<button class="btn-secondary" data-act="toggle" data-id="' + u.id + '">' + (u.is_active ? 'Switch off' : 'Switch on') + '</button><button class="btn-danger" data-act="del" data-id="' + u.id + '">Delete</button>') + '</div></td></tr>';
+  }).join('') + '</tbody></table>';
+}
+
+$('genPass').addEventListener('click', function (e) { e.preventDefault(); $('u_pass').value = makePassword(); });
+
+$('createBtn').addEventListener('click', async function () {
+  showErr('');
+  var body = { name: $('u_name').value.trim(), login: $('u_login').value.trim(), password: $('u_pass').value, role: $('u_role').value };
+  if (!body.name) return showErr('Please enter a name.');
+  if (!body.login) return showErr('Please enter a username.');
+  if (body.password.length < 8) return showErr('The password must be at least 8 characters.');
+  try {
+    var u = await api('POST', '/api/admin/users', body);
+    var base = location.origin.indexOf('http') === 0 ? location.origin : API;
+    $('made').innerHTML = '<div class="made"><strong>Login created for ' + esc(u.name) + '.</strong> Share these details privately. The password cannot be shown again.<br>' +
+      'Website: <code>' + esc(base + '/admin/login.html') + '</code><br>Username: <code>' + esc(u.email) + '</code><br>Password: <code>' + esc(body.password) + '</code>' +
+      (u.role === 'door' ? '<br>After signing in, they go straight to the check-in screen.' : '') + '</div>';
+    $('u_name').value = ''; $('u_login').value = ''; $('u_pass').value = '';
+    load();
+  } catch (e) { if (e.message !== 'login') showErr(e.message); }
+});
+
+document.addEventListener('click', async function (ev) {
+  var b = ev.target.closest ? ev.target.closest('[data-act]') : null; if (!b) return;
+  var id = parseInt(b.getAttribute('data-id'), 10), act = b.getAttribute('data-act');
+  var u = users.filter(function (x) { return x.id === id; })[0]; if (!u) return;
+  showErr('');
+  try {
+    if (act === 'toggle') {
+      var on = !u.is_active;
+      var ok = await ask({ title: on ? 'Switch this login on?' : 'Switch this login off?', body: on ? u.name + ' will be able to sign in again.' : u.name + ' will be signed out straight away and cannot sign in until you switch it back on.', yes: on ? 'Yes, switch on' : 'Yes, switch off', no: 'Cancel', danger: !on });
+      if (!ok) return;
+      await api('PATCH', '/api/admin/users/' + id, { is_active: on });
+    } else if (act === 'del') {
+      var ok2 = await ask({ title: 'Delete this login?', body: u.name + ' (' + u.email + ') will be removed for good and signed out straight away. This cannot be undone.', yes: 'Yes, delete', no: 'Keep it' });
+      if (!ok2) return;
+      await api('DELETE', '/api/admin/users/' + id);
+    } else if (act === 'pw') {
+      var np = await ask({ title: 'New password for ' + u.name, body: 'Type a new password (at least 8 characters). The old one stops working straight away.', input: 'New password', yes: 'Save password', no: 'Cancel', danger: false });
+      if (np === null) return;
+      if (String(np).length < 8) return showErr('The password must be at least 8 characters.');
+      await api('PATCH', '/api/admin/users/' + id, { password: String(np) });
+      $('made').innerHTML = '<div class="made"><strong>Password changed for ' + esc(u.name) + '.</strong><br>Username: <code>' + esc(u.email) + '</code><br>New password: <code>' + esc(String(np)) + '</code></div>';
+    }
+    load();
+  } catch (e) { if (e.message !== 'login') showErr(e.message); }
+});
+
+load();
+</script>
+</body>
+</html>
