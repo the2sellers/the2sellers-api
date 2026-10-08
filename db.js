@@ -236,6 +236,8 @@ async function initSchema() {
   `);
 
   await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS featured_home BOOLEAN NOT NULL DEFAULT false');
+  await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS confirmation_note TEXT');
+  await pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS hold_expires_at TIMESTAMPTZ');
   // Event extras: a per-event price note, plus the host profile, press items and reviews
   // that the public event pages show as social proof.
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS price_note TEXT;`);
