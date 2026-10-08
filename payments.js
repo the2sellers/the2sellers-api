@@ -204,7 +204,7 @@ module.exports = function mountPayments(app, pool, h) {
     const label = ev.title + ' (' + ev.city + ')';
     if (ev.ticket_price_cents > 0) lines.push({ quantity: qty, price_data: { currency: ev.currency, unit_amount: ev.ticket_price_cents, product_data: { name: ('Ticket: ' + label).slice(0, 200), description: detail } } });
     if (dq > 0 && (ev.dinner_price_cents || 0) > 0) lines.push({ quantity: dq, price_data: { currency: ev.currency, unit_amount: ev.dinner_price_cents, product_data: { name: ('Dinner: ' + label).slice(0, 200), description: detail } } });
-    const submitMessage = [ev.title, when, info.place, '', info.refund, '', 'After you pay you will see your QR tickets straight away, and we will email them to ' + email + '.'].filter(function (x, i) { return x !== '' || i > 0; }).join('\n').slice(0, 1190);
+    const submitMessage = [ev.title, when ? 'When: ' + when : '', info.place ? 'Where: ' + info.place : '', info.refund, 'After you pay you will see your QR tickets straight away, and we will email them to ' + email + '.'].filter(Boolean).join('\n\n').slice(0, 1190);
     try {
       const session = await stripe('POST', '/v1/checkout/sessions', {
         mode: 'payment',
