@@ -77,7 +77,7 @@
 
   <div id="emailNotice" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px"></div>
   <div id="payNotice" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px"></div>
-  <div style="margin-bottom:16px"><a class="btn-secondary" style="text-decoration:none;display:inline-block;padding:10px 18px;margin-right:8px" href="/admin/checkin.html">Open door check-in</a><button class="btn-secondary" onclick="runChecks()">Run the daily check now</button> <span id="checkOut" class="hint"></span></div>
+  <div style="margin-bottom:16px"><a class="btn-secondary" style="text-decoration:none;display:inline-block;padding:10px 18px;margin-right:8px" href="/admin/checkin.html">Open door check-in</a><a class="btn-secondary" style="text-decoration:none;display:inline-block;padding:10px 18px;margin-right:8px" href="/admin/users.html">Team logins</a><button class="btn-secondary" onclick="runChecks()">Run the daily check now</button> <span id="checkOut" class="hint"></span></div>
 
   <div id="attendeesBox" class="detail-card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
@@ -558,6 +558,7 @@ async function refundOrder(id, paid) {
   const r = await fetch(API + '/api/admin/orders/' + id + '/refund', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
   let d = {}; try { d = await r.json(); } catch (e) {}
   if (!r.ok) { await notify('Could not complete that', d.error || 'Something went wrong.'); return; }
+  await notify(paid ? 'Refund sent' : 'Booking cancelled', d.emailed ? 'The buyer has been emailed.' : 'The buyer could not be emailed, so please let them know yourself.');
   await showAttendees(bookingData.event.id);
   loadEvents();
 }
