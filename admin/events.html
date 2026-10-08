@@ -629,9 +629,10 @@ async function checkPayments() {
     else {
       const a = d.account || {};
       const mode = d.mode === 'live' ? 'LIVE (real money)' : 'TEST (no real money)';
-      text = 'Payments: Stripe ' + mode + ' connected to ' + (a.name || 'your account') + (a.country ? ' (' + a.country + ')' : '') + (a.charges_enabled ? '' : '. Charges are not enabled on this account') + '.';
+      if (a.restricted) text = 'Payments: Stripe ' + mode + ' is connected and working. (This key is restricted for safety, so your account name is not shown.)';
+      else text = 'Payments: Stripe ' + mode + ' connected to ' + (a.name || 'your account') + (a.country ? ' (' + a.country + ')' : '') + (a.charges_enabled ? '' : '. Charges are not enabled on this account') + '.';
       if (!d.webhook_secret_set) text += ' The webhook secret is not set yet, so payments are confirmed when the buyer returns to the ticket page.';
-      ok = a.charges_enabled && d.webhook_secret_set;
+      ok = (a.restricted || a.charges_enabled) && d.webhook_secret_set;
     }
     el.style.display = 'block';
     el.style.background = ok ? '#E6F2EA' : '#FFF3D6';
