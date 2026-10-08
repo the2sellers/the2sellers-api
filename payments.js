@@ -274,10 +274,28 @@ module.exports = function mountPayments(app, pool, h) {
     }
   }));
 
+  // Tells the buyer that one booking was refunded or cancelled, so they are never left guessing.
+  async function sendRefundEmail(o, kind) {
+    try {
+      const info = typeof h.eventInfo === 'function' ? h.eventInfo(o) : { when: '' };
+      const money = moneyText(o.amount_cents, o.currency);
+      const line = kind === 'refunded'
+        ? 'We have refunded your payment of ' + money + ' for ' + o.title + '. Banks usually show the money within 5 to 10 business days. The tickets for this booking are no longer valid.'
+        : 'Your free booking for ' + o.title + ' has been cancelled, so the tickets for it are no longer valid. There is nothing to pay or refund.';
+      const subject = (kind === 'refunded' ? 'Your refund: ' : 'Booking cancelled: ') + o.title;
+      const text = 'Hello ' + o.buyer_name + ',\n\n' + line + '\n\nEvent: ' + o.title + ' (' + o.city + ')' + (info.when ? '\nWhen: ' + info.when : '') + '\nReference: #' + o.id + '\n\nIf this is not what you expected, just reply to this email.\n\nThe2Sellers.io\n';
+      const html = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0F0F12"><h2 style="font-family:Georgia,serif;font-weight:normal">' + (kind === 'refunded' ? 'Your refund is on its way' : 'Your booking was cancelled') + '</h2><p>Hello ' + esc(o.buyer_name) + ',</p><p>' + esc(line) + '</p>' +
+        '<p style="background:#FAFAF7;border:1px solid #e7e3d8;border-radius:8px;padding:12px 16px"><strong>' + esc(o.title) + '</strong> (' + esc(o.city) + ')' + (info.when ? '<br>' + esc(info.when) : '') + '<br>Reference #' + esc(o.id) + '</p>' +
+        '<p>If this is not what you expected, just reply to this email.</p><p style="color:#5B5D63">The2Sellers.io</p></div>';
+      const r = await sendMail({ to: o.buyer_email, subject: subject, html: html, text: text });
+      return !!(r && r.ok);
+    } catch (e) { return false; }
+  }
+
   // ---------- admin: refund a paid booking, or cancel a free one ----------
   app.post('/api/admin/orders/:id/refund', requireAuth, requireAdmin, ah(async function (req, res) {
     await h.ensureSchema(pool);
-    const r = await pool.query('SELECT o.*, e.city, e.title FROM orders o JOIN events e ON e.id = o.event_id WHERE o.id = $1', [req.params.id]);
+    const r = await pool.query('SELECT o.*, e.city, e.title, e.venue, e.address, e.starts_at, e.ends_at, e.timezone, e.is_online, e.refund_cutoff_days FROM orders o JOIN events e ON e.id = o.event_id WHERE o.id = $1', [req.params.id]);
     const o = r.rows[0];
     if (!o) return res.status(404).json({ error: 'Booking not found' });
     if (o.status !== 'paid') return res.status(409).json({ error: 'Only a confirmed booking can be refunded or cancelled (this one is "' + o.status + '").' });
@@ -289,10 +307,12 @@ module.exports = function mountPayments(app, pool, h) {
         return res.status(502).json({ error: 'Stripe could not refund this payment: ' + e.message });
       }
       await pool.query("UPDATE orders SET status = 'refunded', refunded_at = NOW() WHERE id = $1", [o.id]);
-      return res.json({ ok: true, refunded_cents: o.amount_cents, status: 'refunded' });
+      const emailedR = await sendRefundEmail(o, 'refunded');
+      return res.json({ ok: true, refunded_cents: o.amount_cents, status: 'refunded', emailed: emailedR });
     }
     await pool.query("UPDATE orders SET status = 'cancelled' WHERE id = $1", [o.id]);
-    res.json({ ok: true, refunded_cents: 0, status: 'cancelled' });
+    const emailedC = await sendRefundEmail(o, 'cancelled');
+    res.json({ ok: true, refunded_cents: 0, status: 'cancelled', emailed: emailedC });
   }));
 
   // ---------- admin: cancel an event and refund everyone (the organiser decides, never automatic) ----------
