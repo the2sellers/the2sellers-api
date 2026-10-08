@@ -119,6 +119,7 @@
       <div><label>City</label><input type="text" id="f_city" placeholder="Adelaide" /></div>
       <div><label>Venue</label><input type="text" id="f_venue" placeholder="Venue name" /></div>
       <div><label>Online session?</label><select id="f_online"><option value="false">No, in person</option><option value="true">Yes, online</option></select></div>
+      <div><label>Homepage banner</label><label style="font-weight:500;display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="f_featured" style="width:auto"> Feature on the homepage</label><div class="hint">Shows in the homepage banner while the event is published, upcoming and has seats.</div></div>
     </div>
     <label>Address</label>
     <input type="text" id="f_address" placeholder="Street address and suburb" />
@@ -332,7 +333,7 @@ function removeImage() { selectedImage = null; removeImageFlag = true; $('f_imag
 function resetForm() {
   $('eventId').value = '';
   ['f_slug','f_title','f_subline','f_city','f_venue','f_address','f_starts','f_ends','f_price','f_capacity','f_min','f_dprice','f_includes','f_bcaption','f_video'].forEach(function (id) { $(id).value = ''; });
-  $('f_status').value = 'draft'; $('f_online').value = 'false'; $('f_tz').value = 'Australia/Adelaide'; $('f_currency').value = 'aud'; $('f_pnote').value = '';
+  $('f_status').value = 'draft'; $('f_online').value = 'false'; $('f_tz').value = 'Australia/Adelaide'; $('f_currency').value = 'aud'; $('f_pnote').value = ''; $('f_featured').checked = false;
   $('f_refund').value = '7'; $('f_dcap').value = '0'; $('f_button').value = 'Reserve my seat';
   $('bt_city').checked = true; $('f_bsize').value = 'medium'; $('f_bfocus').value = 'upper'; $('f_bpos').value = 'left';
   $('f_boverlay').value = 60; $('ovVal').textContent = '60';
@@ -360,7 +361,7 @@ async function editEvent(id) {
   $('f_city').value = e.city || ''; $('f_venue').value = e.venue || ''; $('f_address').value = e.address || '';
   $('f_online').value = e.is_online ? 'true' : 'false';
   $('f_tz').value = e.timezone || 'Australia/Adelaide';
-  $('f_currency').value = e.currency || 'aud'; $('f_pnote').value = e.price_note || '';
+  $('f_currency').value = e.currency || 'aud'; $('f_pnote').value = e.price_note || ''; $('f_featured').checked = !!e.featured_home;
   $('f_starts').value = isoToLocalInput(e.starts_at, $('f_tz').value);
   $('f_ends').value = isoToLocalInput(e.ends_at, $('f_tz').value);
   $('f_price').value = (e.ticket_price_cents / 100).toFixed(2);
@@ -396,7 +397,7 @@ async function saveEvent() {
   fd.append('slug', $('f_slug').value.trim());
   fd.append('title', title); fd.append('subline', $('f_subline').value.trim());
   fd.append('city', city); fd.append('venue', $('f_venue').value.trim()); fd.append('address', $('f_address').value.trim());
-  fd.append('is_online', $('f_online').value);
+  fd.append('is_online', $('f_online').value); fd.append('featured_home', $('f_featured').checked ? 'true' : 'false');
   fd.append('timezone', tz);
   fd.append('currency', $('f_currency').value); fd.append('price_note', $('f_pnote').value.trim());
   fd.append('starts_at', zonedToIso($('f_starts').value, tz));
