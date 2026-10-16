@@ -967,6 +967,46 @@ app.post('/api/admin/seo/ping-all', requireAuth, requireAdmin, ah(async (req, re
   res.json({ submitted: urls.length, result: out });
 }));
 
+// ============================================================
+// LINK PREVIEWS (WhatsApp, Facebook, LinkedIn, X, Slack...)
+// Those apps do not run JavaScript, so the website asks these endpoints (from a small PHP file on
+// the web host) for the title, description and picture of an event or blog page and writes them
+// into the page's <head> before sending it.
+// ============================================================
+function ogClip(str, n) { str = String(str || '').replace(/\s+/g, ' ').trim(); return str.length > n ? str.slice(0, n - 1).trim() + '…' : str; }
+
+app.get('/api/public/og/event/:slug', ah(async (req, res) => {
+  const { rows } = await pool.query("SELECT slug, city, title, subline, venue, starts_at, timezone, is_online, (banner_image_data IS NOT NULL AND banner_image_data <> '') AS has_image FROM events WHERE slug = $1 AND status IN ('published', 'closed')", [req.params.slug]);
+  const e = rows[0];
+  if (!e) return res.status(404).json({ error: 'Event not found' });
+  let when = '';
+  try {
+    if (e.starts_at) when = new Date(e.starts_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', timeZone: e.timezone || 'UTC' });
+  } catch (err) { when = ''; }
+  const where = e.is_online ? 'Online' : [e.venue, e.city].filter(Boolean).join(', ');
+  const desc = ogClip([e.subline, [when, where].filter(Boolean).join(' · '), 'Book your seat with Muhammad Bilal Aftab and The2Sellers.io.'].filter(Boolean).join(' — '), 280);
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json({ title: ogClip(e.title + (e.city ? ' — ' + e.city : ''), 90), description: desc, image: e.has_image ? ('https://the2sellers-api.onrender.com/api/public/events/' + encodeURIComponent(e.slug) + '/og-image') : null });
+}));
+
+app.get('/api/public/events/:slug/og-image', ah(async (req, res) => {
+  const { rows } = await pool.query("SELECT banner_image_data FROM events WHERE slug = $1 AND status IN ('published', 'closed')", [req.params.slug]);
+  const m = rows[0] && /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/is.exec(rows[0].banner_image_data || '');
+  if (!m) return res.status(404).end();
+  res.set('Content-Type', m[1]);
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(Buffer.from(m[2], 'base64'));
+}));
+
+app.get('/api/public/og/blog/:slug', ah(async (req, res) => {
+  const { rows } = await pool.query("SELECT title, excerpt, content FROM blog_posts WHERE slug = $1 AND status = 'published'", [req.params.slug]);
+  const p = rows[0];
+  if (!p) return res.status(404).json({ error: 'Post not found' });
+  const plain = String(p.content || '').replace(/<[^>]*>/g, ' ').replace(/[#*_>`]/g, ' ');
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json({ title: ogClip(p.title, 90), description: ogClip(p.excerpt || plain, 280), image: null });
+}));
+
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 // Multer-specific errors (file too large, too many files) get a clear message
