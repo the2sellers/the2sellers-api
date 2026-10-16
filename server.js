@@ -21,15 +21,9 @@ const PORT = process.env.PORT || 4000;
 // Tells Bing (and other IndexNow-compatible engines) about a page the moment
 // it goes live, instead of waiting for their normal crawl schedule. Never
 // throws - if this fails for any reason, publishing itself should still succeed.
-const INDEXNOW_KEY = 'bf71bc2fa0d15d5124517f40712e7877';
+const seo = require('./seo');
 async function pingIndexNow(slug) {
-    try {
-          const url = `https://the2sellers.io/blog-post.html?slug=${encodeURIComponent(slug)}`;
-          const pingUrl = `https://www.bing.com/indexnow?url=${encodeURIComponent(url)}&key=${INDEXNOW_KEY}`;
-          await fetch(pingUrl);
-    } catch (err) {
-          console.error('IndexNow ping failed (non-fatal):', err.message);
-    }
+    return seo.pingIndexNow(['/blog-post.html?slug=' + encodeURIComponent(slug), '/blog.html', '/sitemap.xml']);
 }
 
 // Wrap async route handlers so thrown errors reach Express's error handler
@@ -236,6 +230,7 @@ app.post('/api/admin/banners', requireAuth, uploadBannerImage.single('image'), a
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
     [label, head, sub || null, badge || null, dest || null, layout || 'text', image_data, ['small', 'medium', 'large'].includes(img_size) ? img_size : 'medium', ['top', 'upper', 'center', 'bottom'].includes(img_focus) ? img_focus : 'upper', ['fade', 'box'].includes(img_style) ? img_style : 'fade', display_order_val, is_active_val]
   );
+  seo.pingIndexNow(['/']);
   res.status(201).json(rows[0]);
 }));
 
@@ -529,6 +524,8 @@ app.get('/api/sitemap.xml', ah(async (req, res) => {
       { loc: `${SITE}/ppc-audit.html`, changefreq: 'monthly', priority: '0.9' },
       { loc: `${SITE}/account-management.html`, changefreq: 'monthly', priority: '0.9' },
       { loc: `${SITE}/buy-sell-fba.html`, changefreq: 'monthly', priority: '0.9' },
+      { loc: `${SITE}/1-1`, changefreq: 'monthly', priority: '0.9' },
+      { loc: `${SITE}/events`, changefreq: 'weekly', priority: '0.8' },
       { loc: `${SITE}/browse-fba.html`, changefreq: 'weekly', priority: '0.8' },
       { loc: `${SITE}/blog.html`, changefreq: 'weekly', priority: '0.7' },
       { loc: `${SITE}/privacy-policy.html`, changefreq: 'yearly', priority: '0.3' },
@@ -540,9 +537,20 @@ app.get('/api/sitemap.xml', ah(async (req, res) => {
 
                                  const fmtDate = (d) => new Date(d).toISOString().slice(0, 10);
 
+                                 let events = [];
+                                 try { events = (await pool.query("SELECT slug, updated_at FROM events WHERE status = 'published' ORDER BY starts_at ASC NULLS LAST")).rows; } catch (e) { events = []; }
+                                 let oneToOneMod = null;
+                                 try { oneToOneMod = (await pool.query('SELECT updated_at FROM one_to_one_settings WHERE id = 1')).rows[0]; } catch (e) { oneToOneMod = null; }
+                                 const eventsXml = events.map(ev => `<url>
+                                 <loc>${SITE}/events/${encodeURIComponent(ev.slug)}</loc>
+                                 <lastmod>${fmtDate(ev.updated_at || new Date())}</lastmod>
+                                 <changefreq>weekly</changefreq>
+                                 <priority>0.8</priority>
+                                 </url>`).join('\n');
+
                                  const staticXml = staticPages.map(p => `<url>
                                  <loc>${p.loc}</loc>
-                                 <lastmod>${fmtDate(new Date())}</lastmod>
+                                 <lastmod>${fmtDate(p.loc.endsWith('/1-1') && oneToOneMod && oneToOneMod.updated_at ? oneToOneMod.updated_at : new Date())}</lastmod>
                                  <changefreq>${p.changefreq}</changefreq>
                                  <priority>${p.priority}</priority>
                                  </url>`).join('\n');
@@ -558,6 +566,7 @@ app.get('/api/sitemap.xml', ah(async (req, res) => {
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
     <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     ${staticXml}
+    ${eventsXml}
     ${postsXml}
     </urlset>`);
 }));
@@ -758,6 +767,7 @@ app.post('/api/admin/events', requireAuth, uploadBannerImage.single('image'), ah
   const vals = cols.map((c) => d[c]);
   const ph = cols.map((c, i) => ((c === 'agenda' || c === 'faq') ? '$' + (i + 1) + '::jsonb' : '$' + (i + 1)));
   const { rows } = await pool.query('INSERT INTO events (' + cols.join(', ') + ') VALUES (' + ph.join(', ') + ') RETURNING id, slug', vals);
+  if (d.status === 'published') seo.pingIndexNow(['/events/' + rows[0].slug, '/events', '/sitemap.xml']);
   res.status(201).json(rows[0]);
 }));
 
@@ -779,6 +789,7 @@ app.patch('/api/admin/events/:id', requireAuth, uploadBannerImage.single('image'
   vals.push(req.params.id);
   const { rows } = await pool.query('UPDATE events SET ' + sets.join(', ') + ', updated_at = NOW() WHERE id = $' + vals.length + ' RETURNING id, slug, status', vals);
   if (!rows[0]) return res.status(404).json({ error: 'Event not found' });
+  if (rows[0].status === 'published') seo.pingIndexNow(['/events/' + rows[0].slug, '/events', '/sitemap.xml']);
   res.json(rows[0]);
 }));
 
@@ -945,6 +956,15 @@ app.get('/api/public/proof', ah(async (req, res) => {
     press: { mode: host.press_mode || 'auto', items: press },
     reviews: reviews
   });
+}));
+
+// One button: tell IndexNow search engines (Bing and others) about every page in the sitemap.
+app.post('/api/admin/seo/ping-all', requireAuth, requireAdmin, ah(async (req, res) => {
+  const r = await fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/sitemap.xml');
+  const xml = await r.text();
+  const urls = Array.from(xml.matchAll(/<loc>([^<]+)<\/loc>/g)).map((m) => m[1].replace(/&amp;/g, '&'));
+  const out = await seo.pingIndexNow(urls);
+  res.json({ submitted: urls.length, result: out });
 }));
 
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));

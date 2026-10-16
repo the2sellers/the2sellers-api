@@ -369,6 +369,7 @@ module.exports = function mountSessions(app, pool, h, deps) {
     });
     if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
     await pool.query('UPDATE one_to_one_settings SET ' + sets.join(', ') + ', updated_at = NOW() WHERE id = 1', vals);
+    require('./seo').pingIndexNow(['/1-1', '/', '/sitemap.xml']);
     res.json(settingsOut(await getSettings()));
   }));
 
