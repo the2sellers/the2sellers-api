@@ -231,9 +231,15 @@ module.exports = function mountSessions(app, pool, h, deps) {
     const host = (await pool.query('SELECT photo_data FROM host_profile WHERE id = 1').catch(function () { return { rows: [] }; })).rows[0] || {};
     const m = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/is.exec(s.hero_photo || host.photo_data || '');
     if (!m) return res.redirect(302, 'https://the2sellers.io/og-image.png');
-    res.set('Content-Type', m[1]);
     res.set('Cache-Control', 'public, max-age=3600');
-    res.send(Buffer.from(m[2], 'base64'));
+    try {
+      // 1200x630 JPEG under ~300KB so WhatsApp/Facebook accept it
+      const out = await require('sharp')(Buffer.from(m[2], 'base64')).resize(1200, 630, { fit: 'cover', position: 'attention' }).jpeg({ quality: 78 }).toBuffer();
+      res.set('Content-Type', 'image/jpeg');
+      return res.send(out);
+    } catch (e) {
+      return res.redirect(302, 'https://the2sellers.io/og-image.png');
+    }
   }));
 
   // ---------- public: page content ----------
