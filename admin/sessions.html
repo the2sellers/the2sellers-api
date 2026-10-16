@@ -70,6 +70,7 @@
     <div style="margin-top:14px"><label for="s_video">Video link</label><input type="text" id="s_video" placeholder="https://www.youtube.com/watch?v=..."><div class="hint">Publish your video on YouTube as <strong>Unlisted</strong> (not Private) and paste the link. Vimeo links work too. Leave empty to hide the video.</div></div>
     <div style="margin-top:14px"><label for="s_head">Page headline</label><input type="text" id="s_head"></div>
     <div style="margin-top:14px"><label for="s_intro">Short intro</label><textarea id="s_intro" rows="3"></textarea></div>
+    <div class="grid" style="margin-top:14px"><div><label for="s_clabel">Small label above the "covers" section</label><input type="text" id="s_clabel" maxlength="60"></div><div><label for="s_ctitle">Heading of the "covers" section</label><input type="text" id="s_ctitle" maxlength="200"></div></div>
     <div style="margin-top:14px"><label for="s_covers">What the session covers</label><textarea id="s_covers" rows="5"></textarea><div class="hint">One point per line.</div></div>
     <div style="margin-top:14px"><label for="s_who">Who it is for</label><textarea id="s_who" rows="2"></textarea></div>
     <div style="margin-top:14px"><label for="s_refund">Refund and reschedule wording</label><textarea id="s_refund" rows="2"></textarea></div>
@@ -229,7 +230,7 @@ async function loadSettings() {
   const s = await apiFetch('/admin/one-to-one/settings');
   const $ = function (i) { return document.getElementById(i); };
   $('s_price').value = (s.price_cents / 100); $('s_cur').value = s.currency; $('s_dur').value = s.duration_min; $('s_tool').value = s.meeting_tool || ''; $('s_link').value = s.meeting_link || '';
-  $('s_video').value = s.video_url || ''; $('s_head').value = s.headline || ''; $('s_intro').value = s.intro || ''; $('s_covers').value = s.covers || ''; $('s_who').value = s.who_for || ''; $('s_refund').value = s.refund_text || '';
+  $('s_video').value = s.video_url || ''; $('s_head').value = s.headline || ''; $('s_intro').value = s.intro || ''; $('s_covers').value = s.covers || ''; $('s_clabel').value = s.covers_label || ''; $('s_ctitle').value = s.covers_title || ''; $('s_who').value = s.who_for || ''; $('s_refund').value = s.refund_text || '';
   $('s_acc').checked = !!s.accepting; $('s_banner').checked = !!s.banner_on;
   faqRows = (s.faq || []).map(function (f) { return { q: f.q, a: f.a }; }); faqDraw();
   pic.hero.rm = false; pic.cov.rm = false; $('p_hero').value = ''; $('p_cov').value = '';
@@ -241,7 +242,7 @@ document.getElementById('saveBtn').onclick = async function () {
   try {
     const fd = new FormData();
     const set = { price_cents: Math.round(parseFloat($('s_price').value) * 100), currency: $('s_cur').value.trim(), duration_min: parseInt($('s_dur').value, 10), meeting_tool: $('s_tool').value.trim(), meeting_link: $('s_link').value.trim(),
-      video_url: $('s_video').value.trim(), headline: $('s_head').value.trim(), intro: $('s_intro').value.trim(), covers: $('s_covers').value, who_for: $('s_who').value.trim(), refund_text: $('s_refund').value.trim(),
+      video_url: $('s_video').value.trim(), headline: $('s_head').value.trim(), intro: $('s_intro').value.trim(), covers: $('s_covers').value, covers_label: $('s_clabel').value.trim(), covers_title: $('s_ctitle').value.trim(), who_for: $('s_who').value.trim(), refund_text: $('s_refund').value.trim(),
       accepting: $('s_acc').checked, banner_on: $('s_banner').checked, faq: JSON.stringify(faqRows.filter(function (f) { return f.q.trim() || f.a.trim(); })) };
     Object.keys(set).forEach(function (k) { fd.append(k, set[k]); });
     const incomplete = faqRows.filter(function (f) { return (f.q.trim() && !f.a.trim()) || (!f.q.trim() && f.a.trim()); });
