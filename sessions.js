@@ -225,6 +225,17 @@ module.exports = function mountSessions(app, pool, h, deps) {
     return { state: changed ? 'paid' : (b.status === 'refunded' ? 'refunded' : 'already') };
   }
 
+  // ---------- public: link-preview picture for the 1-1 page (host photo) ----------
+  app.get('/api/public/one-to-one/og-image', ah(async function (req, res) {
+    const s = await getSettings();
+    const host = (await pool.query('SELECT photo_data FROM host_profile WHERE id = 1').catch(function () { return { rows: [] }; })).rows[0] || {};
+    const m = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/is.exec(s.hero_photo || host.photo_data || '');
+    if (!m) return res.redirect(302, 'https://the2sellers.io/og-image.png');
+    res.set('Content-Type', m[1]);
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(Buffer.from(m[2], 'base64'));
+  }));
+
   // ---------- public: page content ----------
   app.get('/api/public/one-to-one', ah(async function (req, res) {
     const s = await getSettings();
