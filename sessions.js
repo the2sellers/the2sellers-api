@@ -15,15 +15,15 @@ const STRIPE_SESSION_MINUTES = 31;
 
 const DEFAULTS = {
   headline: '1-1 Session with Muhammad Bilal Aftab',
-  intro: 'A private one-to-one video session with me. Bring your Amazon or marketplace business, your questions and your numbers. You leave with a clear plan.',
+  intro: 'A private one-to-one video session with me. Whether you sell on Amazon, eBay, TikTok Shop, Shopify, Walmart or beyond, bring your questions and your numbers. You leave with a clear plan.',
   video_url: '',
   price_cents: 10000,
   currency: 'usd',
   duration_min: 45,
   meeting_tool: 'Zoom',
   meeting_link: '',
-  covers: 'A clear look at where your Amazon or marketplace business stands today\nThe biggest opportunities and risks in your account, listings and ads\nA practical plan for your next 90 days\nTime to ask me anything: account health, PPC, buying or selling a business',
-  who_for: 'Sellers who want honest, experienced advice from someone who has built, grown and rescued thousands of marketplace businesses.',
+  covers: 'An honest read on where your business stands today, on whichever marketplace or store you sell\nYour biggest growth opportunities and hidden risks across listings, ads, pricing, logistics and account health\nWhich channels to add next, from Amazon and eBay to TikTok Shop, Temu, Walmart, Shopify and B&Q, and in what order\nSourcing and scaling: suppliers on Alibaba, healthy margins, and taking your brand global\nA clear 90-day action plan you can start on the same day\nRoom to ask me anything, from buying or selling a business to systems, AI, hiring and building the right team',
+  who_for: 'Sellers, founders and eCommerce teams who want straight, experienced advice from someone with 20+ years in technology and global commerce, who runs international eCommerce operations of his own. Whether you are launching your first product or scaling an established brand, you leave knowing exactly what to do next.',
   refund_text: 'If we cannot find a time that works for both of us, you get a full refund. Need to move your session? One free reschedule with at least 24 hours notice.',
   accepting: true,
   banner_on: true,
