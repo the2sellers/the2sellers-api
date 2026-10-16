@@ -278,6 +278,8 @@ async function initSchema() {
       display_order INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS show_on_main BOOLEAN NOT NULL DEFAULT true;
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS show_on_o2o BOOLEAN NOT NULL DEFAULT true;
   `);
   await pool.query(
     `INSERT INTO host_profile (id, name, bio) VALUES (1, $1, $2) ON CONFLICT (id) DO NOTHING`,
