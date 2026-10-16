@@ -4,6 +4,7 @@
 // (status "scheduled") -> session done (status "completed"). Refunds are manual (admin button).
 
 const crypto = require('crypto');
+const multer = require('multer');
 const { requireAuth, requireAdmin } = require('./auth');
 const { sendNotification, sendMail } = require('./email');
 
@@ -25,9 +26,26 @@ const DEFAULTS = {
   who_for: 'Sellers who want honest, experienced advice from someone who has built, grown and rescued thousands of marketplace businesses.',
   refund_text: 'If we cannot find a time that works for both of us, you get a full refund. Need to move your session? One free reschedule with at least 24 hours notice.',
   accepting: true,
-  banner_on: true
+  banner_on: true,
+  banner_label: '1-1 SESSION',
+  banner_head: 'Book a 1-1 Session with Muhammad Bilal Aftab',
+  banner_sub: '',
+  banner_cta: 'Book my session'
 };
-const SETTINGS_TEXT = ['headline', 'intro', 'video_url', 'currency', 'meeting_tool', 'meeting_link', 'covers', 'who_for', 'refund_text'];
+const DEFAULT_FAQ = [
+  { q: 'What happens after I pay?', a: 'You get an email straight away. Within 24 hours I confirm your time by email and WhatsApp and send the video link.' },
+  { q: 'Can I choose the time?', a: 'Yes. Suggest up to three times in your own time zone and I will try to use one of them. If you leave it blank, I will suggest a time.' },
+  { q: 'What if we cannot find a time?', a: '{refund}' },
+  { q: 'Is the session recorded?', a: 'Only if you ask me to. Everything you share stays between us.' }
+];
+const IMG_FIELDS = { banner_image: 'banner_image', hero_photo: 'hero_photo', covers_photo: 'covers_photo' };
+function parseFaq(raw, refund) {
+  let arr = null;
+  try { arr = raw ? JSON.parse(raw) : null; } catch (e) { arr = null; }
+  if (!Array.isArray(arr)) arr = DEFAULT_FAQ;
+  return arr.map(function (x) { return { q: String((x && x.q) || '').trim(), a: String((x && x.a) || '').trim().replace('{refund}', refund || '') }; }).filter(function (x) { return x.q && x.a; });
+}
+const SETTINGS_TEXT = ['banner_label', 'banner_head', 'banner_sub', 'banner_cta', 'headline', 'intro', 'video_url', 'currency', 'meeting_tool', 'meeting_link', 'covers', 'who_for', 'refund_text'];
 const SETTINGS_INT = ['price_cents', 'duration_min'];
 const SETTINGS_BOOL = ['accepting', 'banner_on'];
 const SYMBOLS = { usd: 'US$', aud: 'A$', gbp: '£', eur: '€', aed: 'AED ', cad: 'C$', nzd: 'NZ$', sgd: 'S$', pkr: 'PKR ', inr: '₹' };
@@ -106,6 +124,10 @@ module.exports = function mountSessions(app, pool, h, deps) {
         "amount_cents INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'usd', status TEXT NOT NULL DEFAULT 'pending', public_token TEXT NOT NULL UNIQUE, " +
         'stripe_session_id TEXT, stripe_payment_intent TEXT, scheduled_at TIMESTAMPTZ, scheduled_tz TEXT, meeting_link TEXT, admin_note TEXT, ' +
         'created_at TIMESTAMPTZ NOT NULL DEFAULT now(), paid_at TIMESTAMPTZ, refunded_at TIMESTAMPTZ, completed_at TIMESTAMPTZ)');
+      const cols = ['banner_label', 'banner_head', 'banner_sub', 'banner_cta', 'banner_image', 'hero_photo', 'covers_photo', 'faq'];
+      for (const c of cols) await pool.query('ALTER TABLE one_to_one_settings ADD COLUMN IF NOT EXISTS ' + c + ' TEXT');
+      await pool.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS show_on_main BOOLEAN NOT NULL DEFAULT true').catch(function () {});
+      await pool.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS show_on_o2o BOOLEAN NOT NULL DEFAULT true').catch(function () {});
       const d = DEFAULTS;
       await pool.query(
         'INSERT INTO one_to_one_settings (id, headline, intro, video_url, price_cents, currency, duration_min, meeting_tool, meeting_link, covers, who_for, refund_text, accepting, banner_on) ' +
@@ -117,7 +139,9 @@ module.exports = function mountSessions(app, pool, h, deps) {
   async function getSettings() {
     await ensure();
     const r = await pool.query('SELECT * FROM one_to_one_settings WHERE id = 1');
-    return Object.assign({}, DEFAULTS, r.rows[0] || {});
+    const row = Object.assign({}, r.rows[0] || {});
+    ['banner_label', 'banner_head', 'banner_cta'].forEach(function (k) { if (!row[k]) delete row[k]; });
+    return Object.assign({}, DEFAULTS, row);
   }
 
   // ---------- emails ----------
@@ -203,7 +227,7 @@ module.exports = function mountSessions(app, pool, h, deps) {
   app.get('/api/public/one-to-one', ah(async function (req, res) {
     const s = await getSettings();
     const host = (await pool.query('SELECT name, headline, bio, photo_data FROM host_profile WHERE id = 1').catch(function () { return { rows: [] }; })).rows[0] || {};
-    const reviews = (await pool.query('SELECT kind, author, detail, body, rating, source, source_url, video_url FROM reviews WHERE is_active = true ORDER BY display_order ASC, id ASC').catch(function () { return { rows: [] }; })).rows;
+    const reviews = (await pool.query('SELECT kind, author, detail, body, rating, source, source_url, video_url FROM reviews WHERE is_active = true AND show_on_o2o = true ORDER BY display_order ASC, id ASC').catch(function () { return { rows: [] }; })).rows;
     res.json({
       accepting: !!s.accepting && !!process.env.STRIPE_SECRET_KEY,
       payments: !!process.env.STRIPE_SECRET_KEY,
@@ -212,7 +236,8 @@ module.exports = function mountSessions(app, pool, h, deps) {
       duration_min: s.duration_min, meeting_tool: s.meeting_tool,
       covers: String(s.covers || '').split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean),
       who_for: s.who_for, refund_text: s.refund_text,
-      host: { name: host.name || 'Muhammad Bilal Aftab', headline: host.headline || null, bio: host.bio || null, photo_data: host.photo_data || null },
+      host: { name: host.name || 'Muhammad Bilal Aftab', headline: host.headline || null, bio: host.bio || null, photo_data: s.hero_photo || host.photo_data || null, covers_photo: s.covers_photo || null },
+      faq: parseFaq(s.faq, s.refund_text),
       reviews: reviews
     });
   }));
@@ -294,12 +319,24 @@ module.exports = function mountSessions(app, pool, h, deps) {
   }));
 
   // ---------- admin ----------
+  function settingsOut(s) {
+    const o = Object.assign({}, s);
+    o.faq = parseFaq(s.faq, s.refund_text);
+    o.faq_raw_default = !s.faq;
+    return o;
+  }
   app.get('/api/admin/one-to-one/settings', requireAuth, requireAdmin, ah(async function (req, res) {
-    res.json(await getSettings());
+    res.json(settingsOut(await getSettings()));
   }));
-  app.patch('/api/admin/one-to-one/settings', requireAuth, requireAdmin, ah(async function (req, res) {
+  const imgUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024, files: 3 },
+    fileFilter: function (req, file, cb) { cb(null, ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].indexOf(file.mimetype) >= 0); }
+  }).fields([{ name: 'banner_image', maxCount: 1 }, { name: 'hero_photo', maxCount: 1 }, { name: 'covers_photo', maxCount: 1 }]);
+  app.patch('/api/admin/one-to-one/settings', requireAuth, requireAdmin, imgUpload, ah(async function (req, res) {
     await ensure();
     const b = req.body || {};
+    const files = req.files || {};
     const sets = [], vals = [];
     SETTINGS_TEXT.forEach(function (k) { if (b[k] !== undefined) { vals.push(String(b[k]).slice(0, 4000)); sets.push(k + ' = $' + vals.length); } });
     SETTINGS_INT.forEach(function (k) {
@@ -312,10 +349,24 @@ module.exports = function mountSessions(app, pool, h, deps) {
     SETTINGS_BOOL.forEach(function (k) { if (b[k] !== undefined) { vals.push(b[k] === true || b[k] === 'true'); sets.push(k + ' = $' + vals.length); } });
     if (b.currency !== undefined && !/^[a-zA-Z]{3}$/.test(String(b.currency))) return res.status(400).json({ error: 'Currency must be a 3-letter code such as usd.' });
     if (b.price_cents !== undefined && !(parseInt(b.price_cents, 10) >= 50)) return res.status(400).json({ error: 'The price must be at least 0.50.' });
+    if (b.currency !== undefined) { const i = sets.findIndex(function (x) { return x.indexOf('currency =') === 0; }); if (i >= 0) vals[sets.findIndex(function (x) { return x.indexOf('currency =') === 0; })] = String(b.currency).toLowerCase(); }
+    // questions: JSON list of {q, a}; empty rows are dropped
+    if (b.faq !== undefined) {
+      let arr;
+      try { arr = typeof b.faq === 'string' ? JSON.parse(b.faq) : b.faq; } catch (e) { return res.status(400).json({ error: 'The questions list could not be read.' }); }
+      if (!Array.isArray(arr)) return res.status(400).json({ error: 'The questions list could not be read.' });
+      const clean = arr.slice(0, 30).map(function (x) { return { q: String((x && x.q) || '').trim().slice(0, 300), a: String((x && x.a) || '').trim().slice(0, 2000) }; }).filter(function (x) { return x.q && x.a; });
+      vals.push(JSON.stringify(clean)); sets.push('faq = $' + vals.length);
+    }
+    // pictures: upload replaces, remove_<name> clears (the page then falls back to the host photo or no picture)
+    Object.keys(IMG_FIELDS).forEach(function (k) {
+      const f = files[k] && files[k][0];
+      if (f) { vals.push('data:' + f.mimetype + ';base64,' + f.buffer.toString('base64')); sets.push(k + ' = $' + vals.length); }
+      else if (b['remove_' + k] === 'true' || b['remove_' + k] === true) { sets.push(k + ' = NULL'); }
+    });
     if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
-    if (b.currency !== undefined) { const i = sets.findIndex(function (x) { return x.indexOf('currency =') === 0; }); if (i >= 0) vals[i] = String(b.currency).toLowerCase(); }
     await pool.query('UPDATE one_to_one_settings SET ' + sets.join(', ') + ', updated_at = NOW() WHERE id = 1', vals);
-    res.json(await getSettings());
+    res.json(settingsOut(await getSettings()));
   }));
 
   function rowOut(b, s) {
@@ -439,19 +490,22 @@ module.exports = function mountSessions(app, pool, h, deps) {
 
 // Slide for the homepage banner slider (shown while the 1-1 page is open for bookings).
 module.exports.slide = async function (pool) {
-  const r = await pool.query('SELECT headline, price_cents, currency, duration_min, accepting, banner_on FROM one_to_one_settings WHERE id = 1').catch(function () { return { rows: [] }; });
-  const s = r.rows[0];
-  if (!s || !s.banner_on || !s.accepting) return [];
+  const r = await pool.query('SELECT * FROM one_to_one_settings WHERE id = 1').catch(function () { return { rows: [] }; });
+  const row = r.rows[0];
+  if (!row || !row.banner_on || !row.accepting) return [];
+  const s = Object.assign({}, DEFAULTS, row);
+  ['banner_label', 'banner_head', 'banner_cta'].forEach(function (k) { if (!row[k]) s[k] = DEFAULTS[k]; });
+  const sub = String(s.banner_sub || '').trim() || (s.duration_min + ' minutes · private video session · ' + money(s.price_cents, s.currency));
   return [{
     id: 'one-to-one',
-    label: '1-1 SESSION',
-    head: 'Book a 1-1 Session with Muhammad Bilal Aftab',
-    sub: s.duration_min + ' minutes · private video session · ' + money(s.price_cents, s.currency),
+    label: s.banner_label,
+    head: s.banner_head,
+    sub: sub,
     badge: '',
     dest: PAGE_URL,
-    cta: 'Book my session',
-    layout: 'text',
-    image_data: null,
+    cta: s.banner_cta,
+    layout: row.banner_image ? 'background' : 'text',
+    image_data: row.banner_image || null,
     img_size: 'medium', img_focus: 'upper', img_style: 'fade'
   }];
 };
