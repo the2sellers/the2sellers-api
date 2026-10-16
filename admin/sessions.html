@@ -73,12 +73,38 @@
     <div style="margin-top:14px"><label for="s_covers">What the session covers</label><textarea id="s_covers" rows="5"></textarea><div class="hint">One point per line.</div></div>
     <div style="margin-top:14px"><label for="s_who">Who it is for</label><textarea id="s_who" rows="2"></textarea></div>
     <div style="margin-top:14px"><label for="s_refund">Refund and reschedule wording</label><textarea id="s_refund" rows="2"></textarea></div>
+    <div style="margin-top:22px;border-top:1px solid #E5E1D3;padding-top:18px">
+      <h3 style="margin:0 0 4px;font-size:17px">Pictures on the page</h3>
+      <div class="hint" style="margin:0 0 12px">JPG, PNG, WEBP or GIF, up to 2MB. Choose a new file to replace the picture. Pictures are saved when you press Save settings.</div>
+      <div class="grid">
+        <div>
+          <label>Top of the page (next to the headline)</label>
+          <img id="p_hero_img" alt="" style="display:none;width:120px;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px">
+          <input type="file" id="p_hero" accept="image/jpeg,image/png,image/webp,image/gif">
+          <div class="hint" id="p_hero_note"></div>
+          <button type="button" class="btn-secondary" id="p_hero_rm" style="display:none;margin-top:6px">Remove my picture</button>
+        </div>
+        <div>
+          <label>"What the session covers" section</label>
+          <img id="p_cov_img" alt="" style="display:none;width:120px;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px">
+          <input type="file" id="p_cov" accept="image/jpeg,image/png,image/webp,image/gif">
+          <div class="hint" id="p_cov_note"></div>
+          <button type="button" class="btn-secondary" id="p_cov_rm" style="display:none;margin-top:6px">Remove picture</button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:22px;border-top:1px solid #E5E1D3;padding-top:18px">
+      <h3 style="margin:0 0 4px;font-size:17px">"Good to know" questions</h3>
+      <div class="hint" style="margin:0 0 12px">These appear at the bottom of the page. Add, edit or remove any question. A question needs both a question and an answer.</div>
+      <div id="faqEd"></div>
+      <button type="button" class="btn-secondary" id="faqAdd" style="margin-top:8px">+ Add a question</button>
+    </div>
     <div style="margin-top:16px;display:flex;gap:24px;flex-wrap:wrap">
       <label style="font-weight:400"><input type="checkbox" id="s_acc"> Accepting bookings</label>
-      <label style="font-weight:400"><input type="checkbox" id="s_banner"> Show the banner on the homepage</label>
+      <label style="font-weight:400"><input type="checkbox" id="s_banner"> Show the banner on the homepage</label> <a href="/admin/banners.html" class="btn-secondary">Edit the banner</a>
     </div>
     <div style="margin-top:16px"><button class="btn-primary" id="saveBtn">Save settings</button> <a class="btn-secondary" href="/admin/proof.html" style="margin-left:8px">Add or edit reviews</a></div>
-    <p class="hint" style="margin-top:10px">Reviews on this page come from the Reviews screen (the same ones shown on event pages).</p>
+    <p class="hint" style="margin-top:10px">Reviews come from the Reviews screen. There, tick or untick "Show on the 1-1 page" for each review.</p>
   </div>
 </div>
 <script src="/admin/app.js"></script>
@@ -168,21 +194,65 @@ async function remove(id) {
   try { await apiFetch('/admin/one-to-one/bookings/' + id, { method: 'DELETE' }); await load(); } catch (e) { flash(e.message, true); }
 }
 
+let faqRows = [];
+const pic = { hero: { rm: false }, cov: { rm: false } };
+function faqDraw() {
+  const el = document.getElementById('faqEd');
+  el.innerHTML = faqRows.map(function (f, i) {
+    return '<div style="border:1px solid #E5E1D3;border-radius:8px;padding:12px;margin-bottom:10px;background:#FBFAF5"><label>Question ' + (i + 1) + '</label><input type="text" data-fq="' + i + '" value="' + esc(f.q) + '">' +
+      '<label style="margin-top:8px">Answer</label><textarea rows="2" data-fa="' + i + '">' + esc(f.a) + '</textarea>' +
+      '<div style="margin-top:8px;display:flex;gap:8px"><button type="button" class="btn-secondary" data-fu="' + i + '"' + (i === 0 ? ' disabled' : '') + '>Move up</button><button type="button" class="btn-secondary" data-fd="' + i + '"' + (i === faqRows.length - 1 ? ' disabled' : '') + '>Move down</button><button type="button" class="btn-secondary" data-fr="' + i + '" style="color:#B3261E">Remove</button></div></div>';
+  }).join('') || '<p class="hint">No questions. The "Good to know" section is hidden on the page.</p>';
+  el.querySelectorAll('[data-fq]').forEach(function (n) { n.oninput = function () { faqRows[+n.dataset.fq].q = n.value; }; });
+  el.querySelectorAll('[data-fa]').forEach(function (n) { n.oninput = function () { faqRows[+n.dataset.fa].a = n.value; }; });
+  el.querySelectorAll('[data-fr]').forEach(function (n) { n.onclick = function () { faqRows.splice(+n.dataset.fr, 1); faqDraw(); }; });
+  el.querySelectorAll('[data-fu]').forEach(function (n) { n.onclick = function () { const i = +n.dataset.fu; faqRows.splice(i - 1, 0, faqRows.splice(i, 1)[0]); faqDraw(); }; });
+  el.querySelectorAll('[data-fd]').forEach(function (n) { n.onclick = function () { const i = +n.dataset.fd; faqRows.splice(i + 1, 0, faqRows.splice(i, 1)[0]); faqDraw(); }; });
+}
+document.getElementById('faqAdd').onclick = function () { faqRows.push({ q: '', a: '' }); faqDraw(); };
+function picShow(key, src, note) {
+  const img = document.getElementById('p_' + key + '_img');
+  img.style.display = src ? '' : 'none'; if (src) img.src = src;
+  document.getElementById('p_' + key + '_rm').style.display = src ? '' : 'none';
+  document.getElementById('p_' + key + '_note').textContent = note || '';
+}
+['hero', 'cov'].forEach(function (k) {
+  document.getElementById('p_' + k).onchange = function (e) {
+    const f = e.target.files[0]; if (!f) return;
+    if (f.size > 2 * 1024 * 1024) { flash('That picture is over 2MB. Please choose a smaller one.', true); e.target.value = ''; return; }
+    pic[k].rm = false;
+    const r = new FileReader(); r.onload = function (ev) { picShow(k, ev.target.result, 'New picture chosen. Press Save settings to use it.'); }; r.readAsDataURL(f);
+  };
+  document.getElementById('p_' + k + '_rm').onclick = function () { pic[k].rm = true; document.getElementById('p_' + k).value = ''; picShow(k, '', 'Will be removed when you press Save settings.'); };
+});
 async function loadSettings() {
   const s = await apiFetch('/admin/one-to-one/settings');
   const $ = function (i) { return document.getElementById(i); };
   $('s_price').value = (s.price_cents / 100); $('s_cur').value = s.currency; $('s_dur').value = s.duration_min; $('s_tool').value = s.meeting_tool || ''; $('s_link').value = s.meeting_link || '';
   $('s_video').value = s.video_url || ''; $('s_head').value = s.headline || ''; $('s_intro').value = s.intro || ''; $('s_covers').value = s.covers || ''; $('s_who').value = s.who_for || ''; $('s_refund').value = s.refund_text || '';
   $('s_acc').checked = !!s.accepting; $('s_banner').checked = !!s.banner_on;
+  faqRows = (s.faq || []).map(function (f) { return { q: f.q, a: f.a }; }); faqDraw();
+  pic.hero.rm = false; pic.cov.rm = false; $('p_hero').value = ''; $('p_cov').value = '';
+  picShow('hero', s.hero_photo, s.hero_photo ? '' : 'Using your host profile picture (Press & Reviews screen) if there is one.');
+  picShow('cov', s.covers_photo, s.covers_photo ? '' : 'No picture. Your host profile picture shows as a small round photo.');
 }
 document.getElementById('saveBtn').onclick = async function () {
   const $ = function (i) { return document.getElementById(i); };
   try {
-    await apiFetch('/admin/one-to-one/settings', { method: 'PATCH', body: JSON.stringify({
-      price_cents: Math.round(parseFloat($('s_price').value) * 100), currency: $('s_cur').value.trim(), duration_min: parseInt($('s_dur').value, 10), meeting_tool: $('s_tool').value.trim(), meeting_link: $('s_link').value.trim(),
+    const fd = new FormData();
+    const set = { price_cents: Math.round(parseFloat($('s_price').value) * 100), currency: $('s_cur').value.trim(), duration_min: parseInt($('s_dur').value, 10), meeting_tool: $('s_tool').value.trim(), meeting_link: $('s_link').value.trim(),
       video_url: $('s_video').value.trim(), headline: $('s_head').value.trim(), intro: $('s_intro').value.trim(), covers: $('s_covers').value, who_for: $('s_who').value.trim(), refund_text: $('s_refund').value.trim(),
-      accepting: $('s_acc').checked, banner_on: $('s_banner').checked }) });
+      accepting: $('s_acc').checked, banner_on: $('s_banner').checked, faq: JSON.stringify(faqRows.filter(function (f) { return f.q.trim() || f.a.trim(); })) };
+    Object.keys(set).forEach(function (k) { fd.append(k, set[k]); });
+    const incomplete = faqRows.filter(function (f) { return (f.q.trim() && !f.a.trim()) || (!f.q.trim() && f.a.trim()); });
+    if (incomplete.length) { flash('Each question needs both a question and an answer. Please finish or remove the empty ones.', true); return; }
+    if ($('p_hero').files[0]) fd.append('hero_photo', $('p_hero').files[0]); else if (pic.hero.rm) fd.append('remove_hero_photo', 'true');
+    if ($('p_cov').files[0]) fd.append('covers_photo', $('p_cov').files[0]); else if (pic.cov.rm) fd.append('remove_covers_photo', 'true');
+    const res = await fetch(API_BASE + '/admin/one-to-one/settings', { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + getToken() }, body: fd });
+    let body = null; try { body = await res.json(); } catch (e) {}
+    if (!res.ok) throw new Error((body && body.error) || 'Could not save (' + res.status + ')');
     flash('Saved. The page and the homepage banner are updated.');
+    await loadSettings();
   } catch (e) { flash(e.message, true); }
 };
 loadSettings().catch(function (e) { flash(e.message, true); });
