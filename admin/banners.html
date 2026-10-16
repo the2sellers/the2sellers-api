@@ -111,6 +111,7 @@
     </div>
   </div>
 
+  <div id="o2oCard"></div>
   <div id="bannerList"></div>
 </div>
 
@@ -325,6 +326,61 @@ async function move(id, direction) {
 }
 
 (function () { var row = document.getElementById('imageUploadRow'); var box = document.createElement('div'); box.innerHTML = '<div class="row2"><div><label>Photo size</label><select id="f_size"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></div><div><label>Photo focus (part that stays in view)</label><select id="f_focus"><option value="top">Top</option><option value="upper">Upper-middle</option><option value="center">Middle</option><option value="bottom">Bottom</option></select></div></div><label>Photo style (split layout)</label><select id="f_style"><option value="fade">Soft fade into background</option><option value="box">Framed box</option></select><div class="hint">Size and style apply to the Split layout. Focus applies to both photo layouts.</div>'; row.appendChild(box); var oldOpen = openForm; var oldEdit = editBanner; openForm = function () { oldOpen(); document.getElementById('f_size').value = 'medium'; document.getElementById('f_focus').value = 'upper'; document.getElementById('f_style').value = 'fade'; }; editBanner = function (id) { oldEdit(id); var b = banners.find(function (x) { return x.id === id; }); if (b) { document.getElementById('f_size').value = b.img_size || 'medium'; document.getElementById('f_focus').value = b.img_focus || 'upper'; document.getElementById('f_style').value = b.img_style || 'fade'; } }; })();loadBanners();
+
+// ---- pinned 1-1 Session banner (managed here, also linked from the 1-1 Sessions screen) ----
+let o2o = null, o2oFile = null, o2oRemove = false;
+async function loadO2o() {
+  const el = document.getElementById('o2oCard');
+  try {
+    const r = await fetch(API + '/api/admin/one-to-one/settings', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { el.innerHTML = ''; return; }
+    o2o = await r.json();
+  } catch (e) { el.innerHTML = ''; return; }
+  drawO2o(false);
+}
+function drawO2o(editing) {
+  const el = document.getElementById('o2oCard'); const b = o2o;
+  const sub = (b.banner_sub || '').trim() || (b.duration_min + ' minutes · private video session');
+  if (!editing) {
+    el.innerHTML = '<div class="banner-row ' + (b.banner_on ? '' : 'inactive') + '" style="border:2px solid #E8B939;margin-bottom:14px">' +
+      (b.banner_image ? '<img class="banner-thumb" src="' + b.banner_image + '" alt="" />' : '<div class="banner-thumb empty">No image</div>') +
+      '<div class="banner-main"><div class="banner-label">' + escapeHtml(b.banner_label || '1-1 SESSION') + ' · pinned, 1-1 Session banner</div><div class="banner-head">' + escapeHtml(b.banner_head || 'Book a 1-1 Session with Muhammad Bilal Aftab') + '</div><div class="banner-sub">' + escapeHtml(sub) + '</div></div>' +
+      '<div class="banner-badge">Button: ' + escapeHtml(b.banner_cta || 'Book my session') + '</div>' +
+      '<label class="toggle-active"><input type="checkbox" ' + (b.banner_on ? 'checked' : '') + ' onchange="o2oLive(this.checked)" /> Live</label>' +
+      '<div class="banner-actions"><button onclick="drawO2o(true)">Edit</button></div></div>';
+    return;
+  }
+  o2oFile = null; o2oRemove = false;
+  el.innerHTML = '<div style="border:2px solid #E8B939;border-radius:8px;padding:18px;margin-bottom:14px;background:#fff"><h3 style="margin:0 0 12px">1-1 Session banner</h3>' +
+    '<label>Small label</label><input type="text" id="o_label" value="' + escapeHtml(b.banner_label || '') + '" />' +
+    '<label>Headline</label><input type="text" id="o_head" value="' + escapeHtml(b.banner_head || '') + '" />' +
+    '<label>Line under the headline (blank = length and style of session)</label><input type="text" id="o_sub" value="' + escapeHtml(b.banner_sub || '') + '" />' +
+    '<label>Button words</label><input type="text" id="o_cta" value="' + escapeHtml(b.banner_cta || '') + '" />' +
+    '<label>Background picture (optional, up to 2MB)</label>' + (b.banner_image ? '<img id="o_prev" src="' + b.banner_image + '" style="display:block;max-width:220px;border-radius:6px;margin:6px 0" />' : '<img id="o_prev" style="display:none;max-width:220px;border-radius:6px;margin:6px 0" />') +
+    '<input type="file" id="o_file" accept="image/jpeg,image/png,image/webp,image/gif" /> <button type="button" class="btn-secondary" onclick="o2oRemove=true;o2oFile=null;document.getElementById(\'o_file\').value=\'\';document.getElementById(\'o_prev\').style.display=\'none\'">Remove picture</button>' +
+    '<div style="margin-top:14px;display:flex;gap:10px"><button class="btn-primary" onclick="saveO2o()">Save banner</button><button class="btn-secondary" onclick="drawO2o(false)">Cancel</button></div></div>';
+  document.getElementById('o_file').onchange = function (e) {
+    const f = e.target.files[0]; if (!f) return;
+    if (f.size > 2 * 1024 * 1024) { alert('That picture is over 2MB. Please choose a smaller one.'); e.target.value = ''; return; }
+    o2oFile = f; o2oRemove = false;
+    const rd = new FileReader(); rd.onload = function (ev) { const i = document.getElementById('o_prev'); i.src = ev.target.result; i.style.display = 'block'; }; rd.readAsDataURL(f);
+  };
+}
+async function o2oSave(fd) {
+  const r = await fetch(API + '/api/admin/one-to-one/settings', { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
+  let body = null; try { body = await r.json(); } catch (e) {}
+  if (!r.ok) { alert((body && body.error) || 'Could not save.'); return false; }
+  o2o = body; return true;
+}
+async function o2oLive(on) { const fd = new FormData(); fd.append('banner_on', on ? 'true' : 'false'); if (await o2oSave(fd)) drawO2o(false); else loadO2o(); }
+async function saveO2o() {
+  const fd = new FormData();
+  fd.append('banner_label', document.getElementById('o_label').value.trim()); fd.append('banner_head', document.getElementById('o_head').value.trim());
+  fd.append('banner_sub', document.getElementById('o_sub').value.trim()); fd.append('banner_cta', document.getElementById('o_cta').value.trim());
+  if (o2oFile) fd.append('banner_image', o2oFile); else if (o2oRemove) fd.append('remove_banner_image', 'true');
+  if (await o2oSave(fd)) drawO2o(false);
+}
+loadO2o();
 </script>
 </body>
 </html>
