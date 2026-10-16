@@ -858,7 +858,7 @@ function imageToData(file) {
 }
 
 const PRESS_SPEC = { text: ['kind', 'name', 'url', 'item_date'], int: ['display_order'], bool: ['is_active'], required: ['kind', 'name', 'display_order'], enums: { kind: PRESS_KINDS } };
-const REVIEW_SPEC = { text: ['kind', 'author', 'detail', 'body', 'source', 'source_url', 'video_url'], int: ['rating', 'display_order'], bool: ['is_active'], required: ['kind', 'author', 'display_order'], enums: { kind: REVIEW_KINDS } };
+const REVIEW_SPEC = { text: ['kind', 'author', 'detail', 'body', 'source', 'source_url', 'video_url'], int: ['rating', 'display_order'], bool: ['is_active', 'show_on_main', 'show_on_o2o'], required: ['kind', 'author', 'display_order'], enums: { kind: REVIEW_KINDS } };
 
 // Admin CRUD for a simple list table (press items, reviews).
 function mountList(base, table, spec, imageCol, validate) {
@@ -938,7 +938,7 @@ app.patch('/api/admin/host', requireAuth, uploadBannerImage.single('image'), ah(
 app.get('/api/public/proof', ah(async (req, res) => {
   const { rows: h } = await pool.query('SELECT name, headline, bio, photo_data, video_url, press_mode FROM host_profile WHERE id = 1');
   const { rows: press } = await pool.query('SELECT kind, name, url, logo_data, item_date FROM press_items WHERE is_active = true ORDER BY display_order ASC, id ASC');
-  const { rows: reviews } = await pool.query('SELECT kind, author, detail, body, rating, source, source_url, video_url FROM reviews WHERE is_active = true ORDER BY display_order ASC, id ASC');
+  const { rows: reviews } = await pool.query('SELECT kind, author, detail, body, rating, source, source_url, video_url FROM reviews WHERE is_active = true AND show_on_main = true ORDER BY display_order ASC, id ASC');
   const host = h[0] || {};
   res.json({
     host: { name: host.name || null, headline: host.headline || null, bio: host.bio || null, photo_data: host.photo_data || null, video_url: host.video_url || null },
