@@ -58,6 +58,7 @@ function renderTopbar(activePage) {
       <a href="/admin/blog.html" class="${activePage === 'blog' ? 'active' : ''}">Blog</a>
       <a href="/admin/banners.html" class="${activePage === 'banners' ? 'active' : ''}">Banners</a>
       <a href="/admin/events.html" class="${activePage === 'events' ? 'active' : ''}">Events</a>
+      <a href="/admin/sessions.html" class="${activePage === 'sessions' ? 'active' : ''}">1-1 Sessions</a>
       <a href="/admin/settings.html" class="${activePage === 'settings' ? 'active' : ''}">Settings</a>
     </nav>
     <div class="user">
