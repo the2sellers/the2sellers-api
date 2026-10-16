@@ -229,7 +229,7 @@ module.exports = function mountSessions(app, pool, h, deps) {
   app.get('/api/public/one-to-one/og-image', ah(async function (req, res) {
     const s = await getSettings();
     const host = (await pool.query('SELECT photo_data FROM host_profile WHERE id = 1').catch(function () { return { rows: [] }; })).rows[0] || {};
-    const m = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/is.exec(s.hero_photo || host.photo_data || '');
+    const m = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/is.exec(s.banner_image || s.hero_photo || host.photo_data || '');
     if (!m) return res.redirect(302, 'https://the2sellers.io/og-image.png');
     res.set('Cache-Control', 'public, max-age=3600');
     try {

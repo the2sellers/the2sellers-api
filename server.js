@@ -989,13 +989,32 @@ app.get('/api/public/og/event/:slug', ah(async (req, res) => {
   res.json({ title: ogClip(e.title + (e.city ? ' — ' + e.city : ''), 90), description: desc, image: e.has_image ? ('https://the2sellers-api.onrender.com/api/public/events/' + encodeURIComponent(e.slug) + '/og-image') : null });
 }));
 
+app.get('/api/public/og-page-image/:key', ah(async (req, res) => {
+  const key = String(req.params.key || '').replace(/[^a-z0-9-]/gi, '');
+  const { rows } = await pool.query("SELECT image_data FROM banners WHERE is_active = true AND image_data IS NOT NULL AND image_data <> '' AND dest ILIKE $1 ORDER BY display_order ASC, id ASC LIMIT 1", ['%' + key + '%']);
+  const m = rows[0] && /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/is.exec(rows[0].image_data || '');
+  res.set('Cache-Control', 'public, max-age=3600');
+  if (!m) return res.redirect(302, 'https://the2sellers.io/og-image.png');
+  try {
+    const out = await require('sharp')(Buffer.from(m[2], 'base64')).resize(1200, 630, { fit: 'cover', position: 'attention' }).jpeg({ quality: 78 }).toBuffer();
+    res.set('Content-Type', 'image/jpeg');
+    return res.send(out);
+  } catch (e) { return res.redirect(302, 'https://the2sellers.io/og-image.png'); }
+}));
+
 app.get('/api/public/events/:slug/og-image', ah(async (req, res) => {
   const { rows } = await pool.query("SELECT banner_image_data FROM events WHERE slug = $1 AND status IN ('published', 'closed')", [req.params.slug]);
   const m = rows[0] && /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/is.exec(rows[0].banner_image_data || '');
   if (!m) return res.status(404).end();
-  res.set('Content-Type', m[1]);
   res.set('Cache-Control', 'public, max-age=3600');
-  res.send(Buffer.from(m[2], 'base64'));
+  try {
+    const out = await require('sharp')(Buffer.from(m[2], 'base64')).resize(1200, 630, { fit: 'cover', position: 'attention' }).jpeg({ quality: 78 }).toBuffer();
+    res.set('Content-Type', 'image/jpeg');
+    return res.send(out);
+  } catch (e) {
+    res.set('Content-Type', m[1]);
+    return res.send(Buffer.from(m[2], 'base64'));
+  }
 }));
 
 app.get('/api/public/og/blog/:slug', ah(async (req, res) => {
