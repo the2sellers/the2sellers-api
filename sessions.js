@@ -30,7 +30,9 @@ const DEFAULTS = {
   banner_label: '1-1 SESSION',
   banner_head: 'Book a 1-1 Session with Muhammad Bilal Aftab',
   banner_sub: '',
-  banner_cta: 'Book my session'
+  banner_cta: 'Book my session',
+  covers_label: 'In your session',
+  covers_title: 'Forty-five minutes. Your business. My full attention.'
 };
 const DEFAULT_FAQ = [
   { q: 'What happens after I pay?', a: 'You get an email straight away. Within 24 hours I confirm your time by email and WhatsApp and send the video link.' },
@@ -45,7 +47,7 @@ function parseFaq(raw, refund) {
   if (!Array.isArray(arr)) arr = DEFAULT_FAQ;
   return arr.map(function (x) { return { q: String((x && x.q) || '').trim(), a: String((x && x.a) || '').trim().replace('{refund}', refund || '') }; }).filter(function (x) { return x.q && x.a; });
 }
-const SETTINGS_TEXT = ['banner_label', 'banner_head', 'banner_sub', 'banner_cta', 'headline', 'intro', 'video_url', 'currency', 'meeting_tool', 'meeting_link', 'covers', 'who_for', 'refund_text'];
+const SETTINGS_TEXT = ['covers_label', 'covers_title', 'banner_label', 'banner_head', 'banner_sub', 'banner_cta', 'headline', 'intro', 'video_url', 'currency', 'meeting_tool', 'meeting_link', 'covers', 'who_for', 'refund_text'];
 const SETTINGS_INT = ['price_cents', 'duration_min'];
 const SETTINGS_BOOL = ['accepting', 'banner_on'];
 const SYMBOLS = { usd: 'US$', aud: 'A$', gbp: '£', eur: '€', aed: 'AED ', cad: 'C$', nzd: 'NZ$', sgd: 'S$', pkr: 'PKR ', inr: '₹' };
@@ -124,7 +126,7 @@ module.exports = function mountSessions(app, pool, h, deps) {
         "amount_cents INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'usd', status TEXT NOT NULL DEFAULT 'pending', public_token TEXT NOT NULL UNIQUE, " +
         'stripe_session_id TEXT, stripe_payment_intent TEXT, scheduled_at TIMESTAMPTZ, scheduled_tz TEXT, meeting_link TEXT, admin_note TEXT, ' +
         'created_at TIMESTAMPTZ NOT NULL DEFAULT now(), paid_at TIMESTAMPTZ, refunded_at TIMESTAMPTZ, completed_at TIMESTAMPTZ)');
-      const cols = ['banner_label', 'banner_head', 'banner_sub', 'banner_cta', 'banner_image', 'hero_photo', 'covers_photo', 'faq'];
+      const cols = ['covers_label', 'covers_title', 'banner_label', 'banner_head', 'banner_sub', 'banner_cta', 'banner_image', 'hero_photo', 'covers_photo', 'faq'];
       for (const c of cols) await pool.query('ALTER TABLE one_to_one_settings ADD COLUMN IF NOT EXISTS ' + c + ' TEXT');
       await pool.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS show_on_main BOOLEAN NOT NULL DEFAULT true').catch(function () {});
       await pool.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS show_on_o2o BOOLEAN NOT NULL DEFAULT true').catch(function () {});
@@ -140,7 +142,7 @@ module.exports = function mountSessions(app, pool, h, deps) {
     await ensure();
     const r = await pool.query('SELECT * FROM one_to_one_settings WHERE id = 1');
     const row = Object.assign({}, r.rows[0] || {});
-    ['banner_label', 'banner_head', 'banner_cta'].forEach(function (k) { if (!row[k]) delete row[k]; });
+    ['banner_label', 'banner_head', 'banner_cta', 'covers_label', 'covers_title'].forEach(function (k) { if (!row[k]) delete row[k]; });
     return Object.assign({}, DEFAULTS, row);
   }
 
@@ -235,6 +237,7 @@ module.exports = function mountSessions(app, pool, h, deps) {
       price_cents: s.price_cents, currency: s.currency, price_text: money(s.price_cents, s.currency),
       duration_min: s.duration_min, meeting_tool: s.meeting_tool,
       covers: String(s.covers || '').split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean),
+      covers_label: s.covers_label, covers_title: s.covers_title,
       who_for: s.who_for, refund_text: s.refund_text,
       host: { name: host.name || 'Muhammad Bilal Aftab', headline: host.headline || null, bio: host.bio || null, photo_data: s.hero_photo || host.photo_data || null, covers_photo: s.covers_photo || null },
       faq: parseFaq(s.faq, s.refund_text),
