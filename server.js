@@ -201,7 +201,9 @@ app.get('/api/public/banners', ah(async (req, res) => {
   );
   let featured = [];
   try { featured = await featuredEventSlides(); } catch (e) { featured = []; }
-  res.json(featured.concat(rows));
+  let oneToOne = [];
+  try { oneToOne = await require('./sessions').slide(pool); } catch (e) { oneToOne = []; }
+  res.json(featured.concat(oneToOne, rows));
 }));
 
 app.get('/api/admin/banners', requireAuth, ah(async (req, res) => {
