@@ -71,6 +71,7 @@ body.framed .top{display:none}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:44px}
 .step .n{font-family:var(--display);font-size:44px;color:var(--gold);line-height:1}
 .step h3{font-size:24px;margin:12px 0 8px}
+.coverimg{width:100%;aspect-ratio:4/3;object-fit:cover;object-position:center 20%;border-radius:8px;display:block;margin-bottom:20px}
 .hostcard{display:flex;gap:20px;align-items:center}
 .hostcard img{width:92px;height:92px;border-radius:50%;object-fit:cover;object-position:center 20%}
 .revs{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:44px}
@@ -86,6 +87,9 @@ body.framed .top{display:none}
 .fld .hint{font-size:13px;color:#6B6B72;font-weight:400}
 .fld input,.fld select,.fld textarea{font:inherit;font-size:16px;padding:13px 14px;border:1px solid #CFCBBD;border-radius:6px;background:#fff;color:var(--ink);width:100%}
 .fld input:focus,.fld select:focus,.fld textarea:focus{outline:2px solid var(--gold);border-color:var(--gold)}
+.times{display:grid;grid-template-columns:1fr;gap:10px}
+.tl{display:grid;grid-template-columns:90px minmax(0,1fr);align-items:center;gap:10px;font-size:14px;font-weight:600}
+.tl input{min-width:0;width:100%}
 .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .err{background:#FDECEA;color:#8A1C12;border:1px solid #F3C3BE;border-radius:6px;padding:12px 14px;margin-bottom:16px;font-size:15px}
 .note{background:#FFF7DC;border:1px solid #EBD58B;border-radius:6px;padding:12px 14px;margin-bottom:18px;font-size:15px;color:#5A4506}
@@ -162,6 +166,7 @@ body.framed .top{display:none}
   <div class="two">
    <ul class="ticks" id="covers"></ul>
    <div class="card">
+    <div id="coversPhoto"></div>
     <div class="eb">Who it is for</div>
     <p id="whoFor" style="font-size:18px;margin:12px 0 22px"></p>
     <div class="hostcard" id="hostcard"></div>
@@ -207,7 +212,7 @@ body.framed .top{display:none}
     <div class="fld"><label for="phone">WhatsApp number <span class="hint">with country code, e.g. +44 7xxx xxxxxx</span></label><input id="phone" type="tel" autocomplete="tel" placeholder="+44 7700 900000" required></div>
     <div class="fld"><label for="tz">Your time zone</label><select id="tz"></select></div>
     <div class="fld"><label>Times that suit you <span class="hint">optional, up to three. If you skip this I will suggest a time.</span></label>
-     <div class="row3"><input type="datetime-local" id="p1" aria-label="First choice"><input type="datetime-local" id="p2" aria-label="Second choice"><input type="datetime-local" id="p3" aria-label="Third choice"></div>
+     <div class="times"><label class="tl"><span>1st choice</span><input type="datetime-local" id="p1"></label><label class="tl"><span>2nd choice</span><input type="datetime-local" id="p2"></label><label class="tl"><span>3rd choice</span><input type="datetime-local" id="p3"></label></div>
     </div>
     <div class="fld"><label for="topic">What would you like to cover? <span class="hint">optional</span></label><textarea id="topic" rows="3" placeholder="For example: my account was suspended, or I want to scale my ads."></textarea></div>
     <input class="hp" id="website" tabindex="-1" autocomplete="off" aria-hidden="true">
@@ -218,14 +223,11 @@ body.framed .top{display:none}
  </div>
 </section>
 
-<section class="sec l" style="padding-top:0">
+<section class="sec l" id="faqSec" style="padding-top:0">
  <div class="wrap" style="max-width:820px">
   <h2 class="h2" style="margin-bottom:28px">Good to know</h2>
   <div class="faq">
-   <details><summary>What happens after I pay?</summary><p>You get an email straight away. Within 24 hours I confirm your time by email and WhatsApp and send the video link.</p></details>
-   <details><summary>Can I choose the time?</summary><p>Yes. Suggest up to three times in your own time zone and I will try to use one of them. If you leave it blank, I will suggest a time.</p></details>
-   <details><summary>What if we cannot find a time?</summary><p id="faqRefund"></p></details>
-   <details><summary>Is the session recorded?</summary><p>Only if you ask me to. Everything you share stays between us.</p></details>
+   <div id="faqList"></div>
   </div>
  </div>
 </section>
@@ -280,7 +282,9 @@ function render(d){
   if(vid){ $('vbox').innerHTML=vid; $('videoSec').style.display=''; }
   $('covers').innerHTML=(d.covers||[]).map(function(c){return '<li><span>'+esc(c)+'</span></li>'}).join('');
   $('whoFor').textContent=d.who_for||'';
-  $('hostcard').innerHTML=(photo?'<img alt="" src="'+esc(photo)+'">':'')+'<div><strong>'+esc(hostName)+'</strong><div class="mut" style="font-size:14px">'+esc((d.host&&d.host.headline)||'Founder, The2Sellers.io')+'</div></div>';
+  var cp=d.host&&d.host.covers_photo;
+  $('coversPhoto').innerHTML=cp?'<img class="coverimg" alt="'+esc(hostName)+'" src="'+esc(cp)+'">':'';
+  $('hostcard').innerHTML=((!cp&&photo)?'<img alt="" src="'+esc(photo)+'">':'')+'<div><strong>'+esc(hostName)+'</strong><div class="mut" style="font-size:14px">'+esc((d.host&&d.host.headline)||'Founder, The2Sellers.io')+'</div></div>';
   $('step3').textContent='We meet one to one'+(d.meeting_tool?' on '+d.meeting_tool:' on video')+' for '+d.duration_min+' minutes. Bring your questions and your numbers.';
   var revs=(d.reviews||[]).filter(function(r){return r.body||r.video_url});
   if(revs.length){
@@ -293,7 +297,8 @@ function render(d){
   $('bookSub').textContent=d.price_text+' · '+d.duration_min+' minutes · I confirm your time within 24 hours';
   $('pay').textContent='Pay '+d.price_text+' and book';
   $('refundMini').textContent=d.refund_text?'Refund if we cannot find a time':'';
-  $('faqRefund').textContent=d.refund_text||'';
+  $('faqList').innerHTML=(d.faq||[]).map(function(f){return '<details><summary>'+esc(f.q)+'</summary><p>'+esc(f.a).replace(/\n/g,'<br>')+'</p></details>'}).join('');
+  $('faqSec').style.display=(d.faq&&d.faq.length)?'':'none';
   if(!d.accepting){ $('closed').style.display=''; $('pay').disabled=true; }
 }
 
