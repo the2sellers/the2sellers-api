@@ -85,6 +85,7 @@ async function seatsTaken(client, eventId, excludeOrderId) {
 
 module.exports = function mountPayments(app, pool, h) {
   const ah = h.ah;
+  let oto = null;   // 1-1 sessions (sessions.js), mounted at the end
 
   // Tells the event page whether online payment is switched on.
   app.get('/api/public/config', function (req, res) {
@@ -236,6 +237,11 @@ module.exports = function mountPayments(app, pool, h) {
       await h.ensureSchema(pool);
       const ev = req.body || {};
       const obj = (ev.data && ev.data.object) || {};
+      if (obj.metadata && obj.metadata.kind === 'one_to_one') {
+        // 1-1 session payments are handled by sessions.js
+        try { if (oto) await oto.webhook(ev.type, obj); } catch (e1) { if (e1.retry) return res.status(503).json({ error: 'Booking not ready yet' }); throw e1; }
+        return res.json({ received: true });
+      }
       const orderId = parseInt(obj.client_reference_id || (obj.metadata && obj.metadata.order_id), 10);
       // This Stripe account may also serve other sites. Only act on checkout sessions that WE created for that order.
       let ours = false;
@@ -379,6 +385,10 @@ module.exports = function mountPayments(app, pool, h) {
         const list = await stripe('GET', '/v1/checkout/sessions', { limit: 100, created: { gte: since } });
         for (let i = 0; i < (list.data || []).length; i++) {
           const s = list.data[i];
+          if (s.metadata && s.metadata.kind === 'one_to_one') {
+            if (oto) { try { const hr = await oto.healSession(s); if (hr) report.healed.push(hr); } catch (e0) { report.problems.push('1-1 check: ' + e0.message); } }
+            continue;
+          }
           const oid = parseInt((s.metadata && s.metadata.order_id) || s.client_reference_id, 10);
           if (!oid) continue;
           const o = (await pool.query('SELECT id, status, stripe_session_id FROM orders WHERE id = $1', [oid])).rows[0];
@@ -465,4 +475,6 @@ module.exports = function mountPayments(app, pool, h) {
 
   // Door check-in routes
   require('./checkin')(app, pool, h);
+  // 1-1 sessions
+  oto = require('./sessions')(app, pool, h, { stripe: stripe });
 };
