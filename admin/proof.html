@@ -122,7 +122,9 @@
         <div><label>Where it was posted</label><input type="text" id="r_source" placeholder="e.g. Trustpilot, Google" /></div>
         <div><label>Link to the original</label><input type="url" id="r_surl" placeholder="https://" /></div>
       </div>
-      <label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" id="r_active" checked style="width:auto" /> Show on the page</label>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" id="r_active" checked style="width:auto" /> Live (untick to hide this review everywhere)</label>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" id="r_main" checked style="width:auto" /> Show on the main page and event pages</label>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" id="r_o2o" checked style="width:auto" /> Show on the 1-1 Session page</label>
       <div style="margin-top:14px;display:flex;gap:10px"><button class="btn-primary" onclick="saveReview()">Save</button><button class="btn-secondary" onclick="closeForm('rForm')">Cancel</button></div>
     </div>
     <div id="rList"></div>
@@ -242,7 +244,7 @@ async function loadReviews() {
   reviews = d; await renumber('/api/admin/reviews', reviews);
   $('rList').innerHTML = !reviews.length ? '<div class="empty">No reviews yet. Add real ones, each linked to where it was posted.</div>' : reviews.map(function (r, i) {
     return '<div class="item' + (r.is_active ? '' : ' off') + '"><div class="ord"><button ' + (i === 0 ? 'disabled' : '') + ' onclick="swap(\'/api/admin/reviews\',reviews,' + r.id + ',-1,loadReviews)">▲</button><button ' + (i === reviews.length - 1 ? 'disabled' : '') + ' onclick="swap(\'/api/admin/reviews\',reviews,' + r.id + ',1,loadReviews)">▼</button></div>' +
-      '<span class="chip">' + (r.kind === 'video' ? 'Video' : 'Written') + '</span><div class="main"><div class="t">' + esc(r.author) + (r.detail ? ' · ' + esc(r.detail) : '') + (r.rating ? ' · ' + r.rating + ' stars' : '') + '</div><div class="m">' + esc(r.kind === 'video' ? (r.video_url || '') : (r.body || '').slice(0, 140)) + (r.source ? ' — ' + esc(r.source) : '') + '</div></div>' +
+      '<span class="chip">' + (r.kind === 'video' ? 'Video' : 'Written') + '</span><div class="main"><div class="t">' + esc(r.author) + (r.detail ? ' · ' + esc(r.detail) : '') + (r.rating ? ' · ' + r.rating + ' stars' : '') + '</div><div class="m">' + esc(r.kind === 'video' ? (r.video_url || '') : (r.body || '').slice(0, 140)) + (r.source ? ' — ' + esc(r.source) : '') + '</div><div class="m" style="margin-top:4px">Shows on: ' + ((r.show_on_main !== false ? 'Main page' : '') + (r.show_on_main !== false && r.show_on_o2o !== false ? ' + ' : '') + (r.show_on_o2o !== false ? '1-1 page' : '') || 'nowhere (tick a page when editing)') + '</div></div>' +
       '<label style="margin:0;font-weight:500;font-size:12px;white-space:nowrap"><input type="checkbox" style="width:auto" ' + (r.is_active ? 'checked' : '') + ' onchange="toggle(\'/api/admin/reviews\',' + r.id + ',this.checked,loadReviews)"> Live</label>' +
       '<div class="acts"><button onclick="editReview(' + r.id + ')">Edit</button><button class="danger" onclick="remove(\'/api/admin/reviews\',' + r.id + ',\'review\',loadReviews)">Delete</button></div></div>';
   }).join('');
@@ -250,7 +252,7 @@ async function loadReviews() {
 function reviewKind() { const v = $('r_kind').value === 'video'; $('r_videoBox').style.display = v ? 'block' : 'none'; $('r_textBox').style.display = v ? 'none' : 'block'; }
 function openReview() {
   ['r_id','r_author','r_detail','r_body','r_video','r_rating','r_source','r_surl'].forEach(function (id) { $(id).value = ''; });
-  $('r_kind').value = 'text'; $('r_active').checked = true; reviewKind();
+  $('r_kind').value = 'text'; $('r_active').checked = true; $('r_main').checked = true; $('r_o2o').checked = true; reviewKind();
   $('rForm').classList.add('open'); $('r_author').focus();
 }
 async function editReview(id) {
@@ -258,7 +260,7 @@ async function editReview(id) {
   openReview();
   $('r_id').value = r.id; $('r_kind').value = r.kind; $('r_author').value = r.author || ''; $('r_detail').value = r.detail || '';
   $('r_body').value = r.body || ''; $('r_video').value = r.video_url || ''; $('r_rating').value = r.rating || '';
-  $('r_source').value = r.source || ''; $('r_surl').value = r.source_url || ''; $('r_active').checked = !!r.is_active; reviewKind();
+  $('r_source').value = r.source || ''; $('r_surl').value = r.source_url || ''; $('r_active').checked = !!r.is_active; $('r_main').checked = r.show_on_main !== false; $('r_o2o').checked = r.show_on_o2o !== false; reviewKind();
 }
 async function saveReview() {
   const kind = $('r_kind').value, author = $('r_author').value.trim();
@@ -270,6 +272,7 @@ async function saveReview() {
   fd.append('body', kind === 'text' ? $('r_body').value.trim() : ''); fd.append('video_url', kind === 'video' ? $('r_video').value.trim() : '');
   fd.append('rating', $('r_rating').value); fd.append('source', $('r_source').value.trim()); fd.append('source_url', $('r_surl').value.trim());
   fd.append('is_active', $('r_active').checked ? 'true' : 'false');
+  fd.append('show_on_main', $('r_main').checked ? 'true' : 'false'); fd.append('show_on_o2o', $('r_o2o').checked ? 'true' : 'false');
   if (!id) fd.append('display_order', String(reviews.length));
   const r = await api(id ? 'PATCH' : 'POST', id ? '/api/admin/reviews/' + id : '/api/admin/reviews', fd);
   if (r) { closeForm('rForm'); loadReviews(); }
