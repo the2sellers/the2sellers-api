@@ -210,7 +210,10 @@ var CONTACT_EMAIL = 'contact@the2sellers.io';
 var HOME_URL = 'https://the2sellers.io/';
 
 var qs = new URLSearchParams(location.search);
-var slug = qs.get('e');
+var PRETTY = !/^\/admin\//.test(location.pathname);
+function evUrl(s) { return PRETTY ? '/events/' + encodeURIComponent(s) : '?e=' + encodeURIComponent(s); }
+var TBASE = PRETTY ? '/' : '';
+var slug = qs.get('e') || ((location.pathname.match(/^\/events\/([^\/]+)\/?$/) || [])[1] || null);
 var previewId = qs.get('id');
 var isPreview = qs.get('preview') === '1';
 var ev = null, qty = 1, dq = 0, MATS = null;
@@ -373,7 +376,7 @@ function render(others, proof){
   var pills = '';
   if (others && others.length > 1) {
     pills = '<nav class="pills" aria-label="Other events">' + others.map(function(o){
-      return '<a href="?e=' + encodeURIComponent(o.slug) + '"' + (o.slug === ev.slug ? ' class="on"' : '') + '>' + esc(o.is_online ? 'Online' : o.city) + '</a>';
+      return '<a href="' + evUrl(o.slug) + '"' + (o.slug === ev.slug ? ' class="on"' : '') + '>' + esc(o.is_online ? 'Online' : o.city) + '</a>';
     }).join('') + '</nav>';
   }
 
@@ -501,7 +504,7 @@ async function checkout(){
     var d = {}; try { d = await r.json(); } catch (e0) {}
     if (!r.ok) { msg.textContent = d.error || 'Sorry, we could not complete your booking. Please try again.'; again(); return; }
     if (d.url) { go(d.url); return; }
-    if (d.token) { go('ticket.html?t=' + encodeURIComponent(d.token)); return; }
+    if (d.token) { go(TBASE + 'ticket.html?t=' + encodeURIComponent(d.token)); return; }
     msg.textContent = 'Thank you.'; again();
   } catch (e) { msg.textContent = 'Network problem. Please try again.'; again(); }
 }
@@ -527,7 +530,7 @@ async function load(){
     }
     if (!slug) {
       var rl = await fetch(API + '/api/public/events'); var list = await rl.json();
-      if (list.length) { location.replace('?e=' + encodeURIComponent(list[0].slug)); return; }
+      if (list.length) { location.replace(evUrl(list[0].slug)); return; }
       showState('No events are on sale right now.'); return;
     }
     var r = await fetch(API + '/api/public/events/' + encodeURIComponent(slug));
