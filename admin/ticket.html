@@ -53,7 +53,7 @@ function when(iso, endIso, tz){
     var day = new Intl.DateTimeFormat('en-AU', {timeZone:tz, weekday:'long', day:'numeric', month:'long', year:'numeric'}).format(d);
     var t1 = new Intl.DateTimeFormat('en-AU', {timeZone:tz, hour:'numeric', minute:'2-digit'}).format(d);
     var out = day + ', ' + t1;
-    if (endIso) out += ' to ' + new Intl.DateTimeFormat('en-AU', {timeZone:tz, hour:'numeric', minute:'2-digit', timeZoneName:'short'}).format(new Date(endIso));
+    if (endIso) { var dE = new Intl.DateTimeFormat('en-AU', {timeZone:tz, weekday:'long', day:'numeric', month:'long', year:'numeric'}).format(new Date(endIso)); out += ' to ' + (dE !== day ? dE + ', ' : '') + new Intl.DateTimeFormat('en-AU', {timeZone:tz, hour:'numeric', minute:'2-digit', timeZoneName:'short'}).format(new Date(endIso)); }
     return out;
   } catch (e) { return ''; }
 }
@@ -101,6 +101,7 @@ async function load(){
       '<div class="info"><div><b>When</b><span>' + esc(when(ev.starts_at, ev.ends_at, ev.timezone)) + (ev.timezone ? '<br><small>Time zone: ' + esc(ev.timezone) + '</small>' : '') + '</span></div><div><b>Where</b><span>' + esc(place || 'To be announced') + (ev.map_url ? '<br><a href="' + esc(ev.map_url) + '" target="_blank" rel="noopener">Open in Google Maps</a>' : '') + '</span></div>' + (ev.includes ? '<div><b>Includes</b><span>' + esc(ev.includes) + '</span></div>' : '') + '</div>' +
       (ev.note ? '<div class="note"><b>A note from your host</b><br>' + esc(ev.note) + '</div>' : '') +
       '<div class="row">' + (cal ? '<a class="btn" href="' + esc(cal) + '" target="_blank" rel="noopener">Add to calendar</a>' : '') + '<button class="btn2" onclick="window.print()">Print tickets</button></div>' +
+      (o.materials_count ? '<div class="note noprint" style="border-left-color:#E8B939"><b>Your workshop materials</b><br>' + o.materials_count + ' file' + (o.materials_count === 1 ? '' : 's') + ' ready to download: workbooks, checklists, templates and slides.<br><a class="btn" style="margin-top:12px" href="' + API + '/admin/materials.html?t=' + encodeURIComponent(t) + '">Open my workshop materials</a></div>' : '') +
       tickets + (ev.refund_text ? '<p class="mut noprint" style="font-size:14px">' + esc(ev.refund_text) + '</p>' : '') + '<p class="mut noprint" style="font-size:14px">Show the QR code at the door. Keep this page, or the email we sent you, safe. Anyone with this link can see these tickets.</p>');
   } catch (e) { problem('Something went wrong. Please try again.'); }
 }

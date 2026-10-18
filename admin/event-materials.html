@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+<title>Workshop materials | The2Sellers.io Admin</title>
+<link rel="stylesheet" href="/admin/style.css" />
+<style>
+  .wrap{max-width:980px;margin:0 auto;padding:28px 20px 80px}
+  h1{font-family:'Fraunces',Georgia,serif;font-weight:400;margin:0 0 6px}
+  .lead{color:#5B5D63;margin:0 0 22px}
+  .card{background:#fff;border:1px solid #E7E3D8;border-radius:10px;padding:20px;margin-bottom:22px}
+  .card h2{margin:0 0 12px;font-size:18px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  label{display:block;font-size:13px;font-weight:600;margin:0 0 4px}
+  input[type=text],input[type=number],textarea,select{width:100%;padding:10px 12px;border:1px solid #D8D3C4;border-radius:6px;font-size:15px;box-sizing:border-box;background:#fff;font-family:inherit}
+  textarea{min-height:70px}
+  .hint{font-size:12px;color:#7A7C82;margin-top:4px}
+  .btn-primary{background:#0F0F12;color:#FAFAF7;border:none;border-radius:6px;padding:10px 18px;cursor:pointer;font-size:14px}
+  .btn-primary[disabled]{opacity:.5;cursor:wait}
+  .btn-secondary{background:none;border:1px solid #D8D3C4;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:13px;text-decoration:none;color:inherit;display:inline-block}
+  .btn-danger{background:none;border:1px solid #E0C7C9;color:#B3261E;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #E7E3D8;vertical-align:middle}
+  th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#7A7C82}
+  td input{padding:7px 9px;font-size:14px}
+  .acts{display:flex;gap:6px;flex-wrap:wrap}
+  .sec{font-size:12px;font-weight:700;color:#7A5C0A;background:#FFF6DC;border-radius:10px;padding:2px 8px;display:inline-block}
+  .msg{border-radius:6px;padding:10px 12px;margin:12px 0;font-size:14px;display:none}
+  .msg.err{display:block;background:#FBEAEA;color:#6B1E23;border:1px solid #E0C7C9}
+  .msg.ok{display:block;background:#E6F2EA;color:#1F6B3F;border:1px solid #B9D9C4}
+  .small{font-size:12px;color:#7A7C82}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}.hide-sm{display:none}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/admin/index.html" style="font-weight:700;text-decoration:none;color:inherit">The2Sellers.<span style="color:#E8B939">io</span> — Admin</a>
+  <nav><a href="/admin/events.html" class="active">Events</a><a href="/admin/users.html">Team</a></nav>
+</div>
+<div class="wrap">
+  <p><a href="/admin/events.html" class="small">&larr; Back to events</a></p>
+  <h1>Workshop materials</h1>
+  <p class="lead" id="evname">Loading…</p>
+  <div id="msg" class="msg"></div>
+
+  <div class="card">
+    <h2>Upload a file</h2>
+    <p class="small" style="margin-top:-6px">Only people with a confirmed booking for this event can download these. They get the link in their booking email and on their ticket page. Up to <span id="maxmb">25</span> MB per file.</p>
+    <div class="grid">
+      <div><label>File</label><input type="file" id="u_file" /></div>
+      <div><label>Section</label><input type="text" id="u_section" list="sections" placeholder="e.g. Module workbooks" /><datalist id="sections"><option value="Start here"><option value="Module workbooks"><option value="Templates and tools"><option value="Workshop slides"></datalist></div>
+      <div><label>Title shown to attendees</label><input type="text" id="u_title" placeholder="Leave blank to use the file name" /></div>
+      <div><label>Short description (optional)</label><input type="text" id="u_desc" placeholder="e.g. Checklist, documents, guide and Q&amp;A" /></div>
+    </div>
+    <p style="margin:14px 0 0"><button class="btn-primary" id="u_btn" onclick="uploadFile()">Upload</button> <span class="small" id="u_state"></span></p>
+  </div>
+
+  <div class="card">
+    <h2>Files <span class="small" id="count"></span></h2>
+    <div id="files" class="small">Loading…</div>
+  </div>
+
+  <div class="card">
+    <h2>Message at the top of the download page (optional)</h2>
+    <textarea id="intro" placeholder="e.g. Start with the Start Here guide, then open each module workbook before its session."></textarea>
+    <p style="margin:10px 0 0"><button class="btn-secondary" onclick="saveIntro()">Save message</button></p>
+  </div>
+
+  <div class="card">
+    <h2>Tell everyone who has already booked</h2>
+    <p class="small">New bookings get the link automatically. If you add files after people have booked, send everyone the download link by email. <span id="paid"></span></p>
+    <p><button class="btn-secondary" onclick="notifyAll()">Email the download link to all ticket holders</button></p>
+  </div>
+</div>
+<script>
+var API = 'https://the2sellers-api.onrender.com';
+var token = localStorage.getItem('t2s_admin_token');
+if (!token) location.href = '/admin/login.html';
+var id = new URLSearchParams(location.search).get('id');
+var files = [];
+function $(i){ return document.getElementById(i); }
+function esc(s){ if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function size(b){ if (!b) return ''; if (b < 1024 * 1024) return Math.max(1, Math.round(b / 1024)) + ' KB'; return (b / 1024 / 1024).toFixed(1) + ' MB'; }
+function say(t, ok){ var m = $('msg'); m.textContent = t; m.className = 'msg ' + (ok ? 'ok' : 'err'); if (ok) setTimeout(function(){ m.className = 'msg'; }, 6000); }
+async function api(path, opts){
+  opts = opts || {}; opts.headers = Object.assign({ 'Authorization': 'Bearer ' + token }, opts.headers || {});
+  var r = await fetch(API + path, opts);
+  if (r.status === 401) { location.href = '/admin/login.html'; throw new Error('Signed out'); }
+  var j = null; try { j = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error((j && j.error) || ('Request failed (' + r.status + ')'));
+  return j;
+}
+async function load(){
+  if (!id) { $('evname').textContent = 'No event chosen.'; return; }
+  try {
+    var d = await api('/api/admin/events/' + encodeURIComponent(id) + '/materials');
+    $('evname').textContent = d.event.city + ': ' + d.event.title;
+    $('intro').value = d.event.materials_intro || '';
+    $('maxmb').textContent = d.max_mb;
+    $('paid').textContent = d.paid_bookings + ' confirmed booking' + (d.paid_bookings === 1 ? '' : 's') + ' so far.';
+    files = d.files; render();
+  } catch (e) { say(e.message); }
+}
+function render(){
+  $('count').textContent = files.length ? '(' + files.length + ')' : '';
+  if (!files.length) { $('files').innerHTML = 'No files yet. Upload the first one above.'; return; }
+  $('files').innerHTML = '<table><thead><tr><th style="width:60px">Order</th><th>Section</th><th>Title and description</th><th class="hide-sm">File</th><th></th></tr></thead><tbody>' +
+    files.map(function(f){
+      return '<tr><td><input type="number" id="o' + f.id + '" value="' + f.display_order + '" style="width:60px"></td>' +
+        '<td><input type="text" id="s' + f.id + '" value="' + esc(f.section) + '" list="sections"></td>' +
+        '<td><input type="text" id="t' + f.id + '" value="' + esc(f.title) + '"><input type="text" id="d' + f.id + '" value="' + esc(f.description || '') + '" placeholder="Description" style="margin-top:6px"></td>' +
+        '<td class="hide-sm small">' + esc(f.filename) + '<br>' + size(f.size_bytes) + '</td>' +
+        '<td><div class="acts"><button class="btn-secondary" onclick="saveRow(' + f.id + ')">Save</button><button class="btn-secondary" onclick="dl(' + f.id + ')">Download</button><label class="btn-secondary" style="margin:0;font-weight:400">Replace<input type="file" style="display:none" onchange="replaceFile(' + f.id + ', this)"></label><button class="btn-danger" onclick="del(' + f.id + ')">Delete</button></div></td></tr>';
+    }).join('') + '</tbody></table>';
+}
+async function uploadFile(){
+  var f = $('u_file').files[0];
+  if (!f) { say('Choose a file first.'); return; }
+  var fd = new FormData();
+  fd.append('file', f); fd.append('section', $('u_section').value.trim()); fd.append('title', $('u_title').value.trim()); fd.append('description', $('u_desc').value.trim());
+  $('u_btn').disabled = true; $('u_state').textContent = 'Uploading ' + f.name + '…';
+  try {
+    await api('/api/admin/events/' + encodeURIComponent(id) + '/materials', { method: 'POST', body: fd });
+    $('u_file').value = ''; $('u_title').value = ''; $('u_desc').value = '';
+    say('Uploaded ' + f.name + '.', true); await load();
+  } catch (e) { say(e.message); }
+  $('u_btn').disabled = false; $('u_state').textContent = '';
+}
+async function saveRow(fid){
+  try {
+    await api('/api/admin/materials/' + fid, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ display_order: $('o' + fid).value, section: $('s' + fid).value, title: $('t' + fid).value, description: $('d' + fid).value }) });
+    say('Saved.', true); await load();
+  } catch (e) { say(e.message); }
+}
+async function replaceFile(fid, input){
+  var f = input.files[0]; if (!f) return;
+  var fd = new FormData(); fd.append('file', f);
+  try { say('Replacing…', true); await api('/api/admin/materials/' + fid, { method: 'PATCH', body: fd }); say('File replaced with ' + f.name + '.', true); await load(); } catch (e) { say(e.message); }
+}
+async function del(fid){
+  var f = files.find(function(x){ return x.id === fid; });
+  if (!confirm('Delete "' + (f ? f.title : 'this file') + '"? Attendees will no longer see it.')) return;
+  try { await api('/api/admin/materials/' + fid, { method: 'DELETE' }); say('Deleted.', true); await load(); } catch (e) { say(e.message); }
+}
+async function dl(fid){
+  try {
+    var r = await fetch(API + '/api/admin/materials/' + fid + '/download', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) throw new Error('Could not download');
+    var b = await r.blob(), f = files.find(function(x){ return x.id === fid; });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = f ? f.filename : 'file'; a.click();
+  } catch (e) { say(e.message); }
+}
+async function saveIntro(){
+  try { await api('/api/admin/events/' + encodeURIComponent(id) + '/materials-intro', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ intro: $('intro').value }) }); say('Message saved.', true); } catch (e) { say(e.message); }
+}
+async function notifyAll(){
+  if (!confirm('Email the download link to everyone with a confirmed booking for this event?')) return;
+  try { var r = await api('/api/admin/events/' + encodeURIComponent(id) + '/materials/notify', { method: 'POST' }); say('Sent to ' + r.sent + ' of ' + r.bookings + ' booking' + (r.bookings === 1 ? '' : 's') + (r.failed ? ' (' + r.failed + ' failed)' : '') + '.', !r.failed); } catch (e) { say(e.message); }
+}
+load();
+</script>
+</body>
+</html>

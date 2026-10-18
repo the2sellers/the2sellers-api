@@ -241,6 +241,9 @@ async function initSchema() {
   // Event extras: a per-event price note, plus the host profile, press items and reviews
   // that the public event pages show as social proof.
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS price_note TEXT;`);
+  // Early bird: an optional lower price that applies until early_until, then the standard price.
+  await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS early_price_cents INTEGER');
+  await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS early_until TIMESTAMPTZ');
   await pool.query(`
     CREATE TABLE IF NOT EXISTS host_profile (
       id INTEGER PRIMARY KEY DEFAULT 1,

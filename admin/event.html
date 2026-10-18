@@ -189,6 +189,11 @@ a.pi:hover .pn{color:var(--gold)}
 @media(max-width:900px){.rgrid{grid-template-columns:1fr}.host .portrait{min-height:300px}}
 .chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer;color:#33333A}
 .chk input{margin-top:3px;width:18px;height:18px;flex:none}
+.was{color:#8E8B83;font-weight:400;font-size:.62em;margin-left:10px;text-decoration:line-through}
+.early{display:inline-block;background:rgba(232,185,57,.14);border:1px solid rgba(232,185,57,.5);color:inherit;border-radius:6px;padding:8px 12px;font-size:15px;font-weight:600;margin:4px 0 18px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.mrow{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid rgba(127,127,127,.18);font-size:15px}
+.mrow svg{flex:0 0 16px;margin-top:3px}
 </style>
 </head>
 <body>
@@ -208,7 +213,7 @@ var qs = new URLSearchParams(location.search);
 var slug = qs.get('e');
 var previewId = qs.get('id');
 var isPreview = qs.get('preview') === '1';
-var ev = null, qty = 1, dq = 0;
+var ev = null, qty = 1, dq = 0, MATS = null;
 
 function esc(s){ if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 var SYM = {aud:'A$',gbp:'£',usd:'US$',eur:'€',aed:'AED ',cad:'C$',nzd:'NZ$',sgd:'S$',pkr:'PKR ',inr:'₹'};
@@ -219,6 +224,15 @@ function money(c, cur){
   return (SYM[cur] !== undefined ? SYM[cur] : cur.toUpperCase() + ' ') + (v % 1 === 0 ? v.toLocaleString('en-AU') : v.toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2}));
 }
 function priceNote(){ return ev.price_note || ('Price in ' + String(ev.currency || 'aud').toUpperCase()); }
+// The price a buyer pays right now: the early-bird price until its end date, then the ticket price.
+function unit(){ return (ev.current_price_cents === null || ev.current_price_cents === undefined) ? ev.ticket_price_cents : ev.current_price_cents; }
+function earlyOn(){ return !!ev.early_active && ev.ticket_price_cents > unit(); }
+function earlyText(){
+  if (!earlyOn()) return '';
+  var d = ''; try { d = new Intl.DateTimeFormat('en-AU', {timeZone: ev.timezone || 'Australia/Adelaide', weekday:'short', day:'numeric', month:'long'}).format(new Date(ev.early_until)); } catch (e) {}
+  var off = Math.round((1 - unit() / ev.ticket_price_cents) * 100);
+  return 'Early bird, ' + off + '% off until ' + d + '. Then ' + money(ev.ticket_price_cents) + '.';
+}
 var KIND = {podcast:'Podcast', article:'Article', profile:'Profile', tv:'TV', newspaper:'Newspaper', radio:'Radio', other:''};
 function ytId(u){ var m = (u || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{6,})/); return m ? m[1] : null; }
 function safeUrl(u){ return /^https?:\/\//i.test(u || '') ? u : ''; }
@@ -230,7 +244,7 @@ function when(iso, endIso, tz){
     var day = new Intl.DateTimeFormat('en-AU', {timeZone:tz, weekday:'long', day:'numeric', month:'long', year:'numeric'}).format(d);
     var t1 = new Intl.DateTimeFormat('en-AU', {timeZone:tz, hour:'numeric', minute:'2-digit'}).format(d);
     var out = day + ', ' + t1;
-    if (endIso) { out += ' to ' + new Intl.DateTimeFormat('en-AU', {timeZone:tz, hour:'numeric', minute:'2-digit', timeZoneName:'short'}).format(new Date(endIso)); }
+    if (endIso) { var dE = new Intl.DateTimeFormat('en-AU', {timeZone:tz, weekday:'long', day:'numeric', month:'long', year:'numeric'}).format(new Date(endIso)); out += ' to ' + (dE !== day ? dE + ', ' : '') + new Intl.DateTimeFormat('en-AU', {timeZone:tz, hour:'numeric', minute:'2-digit', timeZoneName:'short'}).format(new Date(endIso)); }
     return out;
   } catch (e) { return ''; }
 }
@@ -269,8 +283,8 @@ document.addEventListener('click', function(e){ var b = e.target.closest ? e.tar
 function saleState(){
   if (ev.status === 'closed') return {open:false, label:'Sales have closed'};
   if (ev.seats_left <= 0) return {open:false, label:'Sold out'};
-  if (!ev.ticket_price_cents ? !FREE_ENABLED : !CHECKOUT_ENABLED) return {open:false, label:'Booking opens soon'};
-  return {open:true, label:(!ev.ticket_price_cents && (!ev.button_text || ev.button_text === 'Reserve my seat')) ? 'Reserve my free seat' : (ev.button_text || 'Reserve my seat')};
+  if (!unit() ? !FREE_ENABLED : !CHECKOUT_ENABLED) return {open:false, label:'Booking opens soon'};
+  return {open:true, label:(!unit() && (!ev.button_text || ev.button_text === 'Reserve my seat')) ? 'Reserve my free seat' : (ev.button_text || 'Reserve my seat')};
 }
 
 // ---------- social proof ----------
@@ -324,7 +338,7 @@ function buildReviews(proof){
 // ---------- render ----------
 function render(others, proof){
   var s = saleState();
-  var free = !ev.ticket_price_cents;
+  var free = !unit();
   var tz = ev.timezone || 'Australia/Adelaide';
   var cityName = ev.is_online ? 'Online' : ev.city;
   var wh = when(ev.starts_at, ev.ends_at, tz);
@@ -339,7 +353,7 @@ function render(others, proof){
   var textBlock = '<div class="eb">' + esc(cityName) + ' &nbsp;·&nbsp; ' + esc(shortWhen(ev.starts_at, tz) || 'Date to be announced') + (ev.venue && !ev.is_online ? ' &nbsp;·&nbsp; ' + esc(ev.venue) : '') + '</div>' +
     '<h1>' + splitHead(ev.title) + '</h1>' +
     (ev.subline ? '<p class="sub">' + esc(ev.subline) + '</p>' : '') +
-    '<div class="priceline"><span class="p">' + money(ev.ticket_price_cents) + '</span><span class="n">' + (free ? 'no payment needed' : 'per seat &nbsp;·&nbsp; ' + esc(priceNote()) + ' &nbsp;·&nbsp; no booking fees') + '</span></div>' +
+    '<div class="priceline"><span class="p">' + money(unit()) + '</span>' + (earlyOn() ? '<s class="was" style="font-size:22px;margin:0 8px 0 0">' + money(ev.ticket_price_cents) + '</s>' : '') + '<span class="n">' + (free ? 'no payment needed' : 'per seat &nbsp;·&nbsp; ' + esc(priceNote()) + ' &nbsp;·&nbsp; no booking fees') + '</span></div>' + (earlyOn() ? '<p class="early">' + esc(earlyText()) + '</p>' : '') +
     '<div class="cta-row">' + cta + introBtn + '</div>' + seatsLine;
 
   var hero;
@@ -367,8 +381,8 @@ function render(others, proof){
 
   var foryou = '<section class="sec l"><div class="wrap"><div class="eb">Be honest with yourself</div><h2 class="h2" style="margin:14px 0 44px">Is this for you?</h2><div class="two">' +
     '<div class="card"><h3>This is for you if</h3>' +
-    '<div class="row">' + CHECK + '<p>You already sell something, on eBay, your own site or in a shop, and want to add Amazon.</p></div>' +
-    '<div class="row">' + CHECK + '<p>You have stock or a product idea and want to know what is realistic before you spend.</p></div>' +
+    '<div class="row">' + CHECK + '<p>You are starting from zero, or you already sell and want to do Amazon properly.</p></div>' +
+    '<div class="row">' + CHECK + '<p>You want to understand every step: business set-up, accounts, products, shipping and advertising.</p></div>' +
     '<div class="row">' + CHECK + '<p>You want straight answers on fees, rules and the account risks that catch sellers out.</p></div></div>' +
     '<div class="card"><h3>This is not for you if</h3>' +
     '<div class="row">' + CROSS + '<p>You want a promise of income. We do not make one.</p></div>' +
@@ -379,8 +393,20 @@ function render(others, proof){
   var agenda = '';
   var ag = (ev.agenda || []).filter(function(a){ return a && (a.title || a.time || a.text); });
   if (ag.length) {
-    agenda = '<section class="sec"><div class="wrap ag"><div><div class="eb">The day</div><h2 class="h2" style="margin-top:14px">What happens on the day</h2></div><div>' +
+    agenda = '<section class="sec"><div class="wrap ag"><div><div class="eb">The programme</div><h2 class="h2" style="margin-top:14px">What we cover</h2></div><div>' +
       ag.map(function(a){ return '<div class="ag-row"><div class="t">' + esc(a.time) + '</div><div><h3>' + esc(a.title) + '</h3>' + (a.text ? '<p class="mut" style="margin-top:8px">' + esc(a.text) + '</p>' : '') + '</div></div>'; }).join('') + '</div></div></section>';
+  }
+
+  // What ticket holders download: file titles only, grouped by section.
+  var mats = '';
+  var mf = (MATS && MATS.files) || [];
+  if (mf.length) {
+    var mg = [], mby = {};
+    mf.forEach(function(f){ if (!mby[f.section]) { mby[f.section] = []; mg.push(f.section); } mby[f.section].push(f); });
+    var LOCK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C99721" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+    mats = '<section class="sec m"><div class="wrap"><div class="eb">Included with your ticket</div><h2 class="h2" style="margin:14px 0 14px">What you take home</h2>' +
+      '<p class="mut" style="font-size:18px;max-width:760px;margin:0 0 36px">' + mf.length + ' files in your private download area, unlocked as soon as you book. Every module has its own checklist, document list, guide, hands-on task and Q&amp;A, so you can do each step yourself afterwards.</p>' +
+      '<div class="mgrid">' + mg.map(function(g){ return '<div class="card"><h3 style="margin-bottom:14px">' + esc(g) + '</h3>' + mby[g].map(function(f){ return '<div class="mrow">' + LOCK + '<span>' + esc(f.title) + '</span></div>'; }).join('') + '</div>'; }).join('') + '</div></div></section>';
   }
 
   var hostHtml = buildHost(proof), pressHtml = buildPress(proof), reviewsHtml = buildReviews(proof);
@@ -388,7 +414,7 @@ function render(others, proof){
   // ticket box
   var maxQ = Math.max(1, Math.min(10, ev.seats_left || 1));
   var dinnerOn = (ev.dinner_price_cents !== null && ev.dinner_price_cents !== undefined && ev.dinner_left > 0);
-  var buy = '<div class="card buy" id="buybox"><div class="pr"><b id="pp">' + money(ev.ticket_price_cents) + '</b><span class="fine" style="text-align:right">' + (free ? '' : esc(priceNote())) + '</span></div>' +
+  var buy = '<div class="card buy" id="buybox"><div class="pr"><b id="pp">' + money(unit()) + (earlyOn() ? ' <s class="was">' + money(ev.ticket_price_cents) + '</s>' : '') + '</b><span class="fine" style="text-align:right">' + (free ? '' : esc(priceNote())) + '</span></div>' + (earlyOn() ? '<p class="early" style="margin:0 0 14px">' + esc(earlyText()) + '</p>' : '') +
     '<div class="stepper"><span>Seats</span><div class="ctl"><button type="button" id="qm" aria-label="Fewer seats">&minus;</button><span class="v" id="qv">1</span><button type="button" id="qp" aria-label="More seats">+</button></div></div>' +
     (dinnerOn ? '<div class="stepper" id="drow"><span><strong>Add dinner with Bilal</strong><br><span class="fine" style="text-align:left">' + money(ev.dinner_price_cents) + ' each &nbsp;·&nbsp; ' + ev.dinner_left + ' left</span></span><div class="ctl"><button type="button" id="dm" aria-label="Fewer dinners">&minus;</button><span class="v" id="dv">0</span><button type="button" id="dpl" aria-label="More dinners">+</button></div></div>' : '') +
     '<div class="tot"><span>Total</span><span id="tt"></span></div>' +
@@ -421,18 +447,18 @@ function render(others, proof){
 
   var foot = '<footer class="foot"><div class="wrap"><span>' + esc(CONTACT_EMAIL) + '</span><span><a href="' + esc(HOME_URL) + '">The2Sellers.io</a></span></div></footer>';
 
-  var sbar = '<div class="sbar"><div><div class="sp">' + money(ev.ticket_price_cents) + '</div>' + (ev.seats_left > 0 && ev.status !== 'closed' ? '<div class="sl">' + ev.seats_left + ' seats left</div>' : '') + '</div><a class="btn' + (s.open ? '' : ' off') + '" href="#tickets">' + btnText + '</a></div>';
+  var sbar = '<div class="sbar"><div><div class="sp">' + money(unit()) + '</div>' + (ev.seats_left > 0 && ev.status !== 'closed' ? '<div class="sl">' + ev.seats_left + ' seats left</div>' : '') + '</div><a class="btn' + (s.open ? '' : ' off') + '" href="#tickets">' + btnText + '</a></div>';
 
   var top = (isPreview ? '<div class="pvbar">Preview. This is how the page looks. Status: ' + esc(ev.status) + '</div>' : '') +
     '<header class="top"><div class="wrap"><a class="logo" href="' + esc(HOME_URL) + '">The2Sellers<span>.io</span></a>' + pills + '<a class="btn' + (s.open ? '' : ' off') + '" href="#tickets">' + btnText + '</a></div></header>';
 
-  document.getElementById('app').innerHTML = top + hero + stats + pressHtml + foryou + agenda + hostHtml + reviewsHtml + tickets + promise + faq + final + foot + sbar;
+  document.getElementById('app').innerHTML = top + hero + stats + pressHtml + foryou + agenda + mats + hostHtml + reviewsHtml + tickets + promise + faq + final + foot + sbar;
   document.title = ev.title + ' | ' + cityName + ' | The2Sellers.io';
   wireBuy(maxQ, dinnerOn, s);
 }
 
 // ---------- ticket box ----------
-function total(){ return ev.ticket_price_cents * qty + (ev.dinner_price_cents || 0) * dq; }
+function total(){ return unit() * qty + (ev.dinner_price_cents || 0) * dq; }
 function refreshTotals(maxQ, dinnerOn){
   document.getElementById('qv').textContent = qty;
   document.getElementById('qm').disabled = qty <= 1;
@@ -512,6 +538,7 @@ async function load(){
     var others = [];
     try { others = await (await fetch(API + '/api/public/events')).json(); } catch (e2) {}
     var proof = {}; try { proof = await (await fetch(API + '/api/public/proof')).json(); } catch (e4) {}
+    try { MATS = await (await fetch(API + '/api/public/events/' + encodeURIComponent(slug) + '/materials-preview')).json(); } catch (e7) { MATS = null; }
     render(others, proof);
     if (qs.get('cancelled') === '1') { var cn = document.createElement('div'); cn.className = 'pvbar'; cn.style.background = '#17171B'; cn.textContent = 'Payment cancelled. Your seats were released. You can book again below.'; var appEl = document.getElementById('app'); appEl.insertBefore(cn, appEl.firstChild); }
   } catch (err) { showState('Something went wrong. Please try again.'); }

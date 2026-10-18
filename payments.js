@@ -5,6 +5,7 @@
 const crypto = require('crypto');
 const { requireAuth, requireAdmin } = require('./auth');
 const { sendNotification, sendMail } = require('./email');
+const pricing = require('./pricing');
 
 const EVENT_PAGE_URL = process.env.EVENT_PAGE_URL || 'https://the2sellers-api.onrender.com/admin/event.html';
 const HOLD_MINUTES = 32;        // seats are held this long while the buyer pays
@@ -165,14 +166,16 @@ module.exports = function mountPayments(app, pool, h) {
     if (dq < 0 || dq > qty) return res.status(400).json({ error: 'Dinner seats cannot be more than your seats.' });
 
     const client = await pool.connect();
-    let ev, orderId, token, total;
+    let ev, orderId, token, total, unitCents = 0, isEarly = false;
     try {
       await client.query('BEGIN');
       const evr = await client.query("SELECT * FROM events WHERE slug = $1 AND status = 'published' FOR UPDATE", [req.params.slug]);
       ev = evr.rows[0];
       if (!ev) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'This event is not available.' }); }
       if (dq > 0 && (ev.dinner_price_cents === null || ev.dinner_price_cents === undefined)) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Dinner is not offered for this event.' }); }
-      const ticketCents = ev.ticket_price_cents * qty;
+      unitCents = pricing.currentTicketCents(ev);
+      isEarly = pricing.earlyActive(ev);
+      const ticketCents = unitCents * qty;
       const dinnerCents = dq > 0 ? (ev.dinner_price_cents || 0) * dq : 0;
       total = ticketCents + dinnerCents;
       if (total <= 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'This booking is free, so no payment is needed.' }); }
@@ -203,7 +206,7 @@ module.exports = function mountPayments(app, pool, h) {
     const detail = [when, info.place, 'Booked for ' + name].filter(Boolean).join(' · ').slice(0, 480);
     const lines = [];
     const label = ev.title + ' (' + ev.city + ')';
-    if (ev.ticket_price_cents > 0) lines.push({ quantity: qty, price_data: { currency: ev.currency, unit_amount: ev.ticket_price_cents, product_data: { name: ('Ticket: ' + label).slice(0, 200), description: detail } } });
+    if (unitCents > 0) lines.push({ quantity: qty, price_data: { currency: ev.currency, unit_amount: unitCents, product_data: { name: ((isEarly ? 'Early-bird ticket: ' : 'Ticket: ') + label).slice(0, 200), description: detail } } });
     if (dq > 0 && (ev.dinner_price_cents || 0) > 0) lines.push({ quantity: dq, price_data: { currency: ev.currency, unit_amount: ev.dinner_price_cents, product_data: { name: ('Dinner: ' + label).slice(0, 200), description: detail } } });
     const submitMessage = [ev.title, when ? 'When: ' + when : '', info.place ? 'Where: ' + info.place : '', info.refund, 'After you pay you will see your QR tickets straight away, and we will email them to ' + email + '.'].filter(Boolean).join('\n\n').slice(0, 1190);
     try {

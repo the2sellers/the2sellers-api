@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Your workshop materials | The2Sellers.io</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{--ink:#0F0F12;--paper:#FAFAF7;--warm:#F2EFE6;--gold:#E8B939;--gold2:#C99721;--mut:#B9B9BE;--line:#26262C;--display:'Fraunces',Georgia,serif;--body:'Inter',-apple-system,Segoe UI,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--body);line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.top{border-bottom:1px solid var(--line)}
+.top .in{max-width:860px;margin:0 auto;padding:18px 22px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-family:var(--display);font-size:22px;font-weight:600;text-decoration:none}
+.logo span{color:var(--gold)}
+.wrap{max-width:860px;margin:0 auto;padding:40px 22px 90px}
+.eb{font-size:12px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,5vw,44px);line-height:1.1;margin:10px 0 10px}
+h2{font-family:var(--display);font-weight:400;font-size:24px;margin:40px 0 14px}
+.mut{color:var(--mut)}
+.intro{background:#17171B;border-left:4px solid var(--gold);border-radius:6px;padding:16px 18px;margin:22px 0 8px;white-space:pre-line}
+.list{display:grid;gap:10px}
+.f{display:flex;align-items:center;gap:16px;background:var(--paper);color:var(--ink);border-radius:10px;padding:16px 18px}
+.ic{flex:0 0 46px;height:46px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;letter-spacing:.05em;color:#7A5C0A}
+.fm{flex:1;min-width:0}
+.ft{font-weight:600}
+.fd{font-size:14px;color:#5B5D63;margin-top:2px}
+.fs{font-size:12px;color:#8E8B83;margin-top:4px}
+.btn{display:inline-block;background:var(--gold);color:var(--ink);font-weight:600;font-size:14px;padding:11px 18px;border-radius:4px;border:0;text-decoration:none;cursor:pointer;font-family:var(--body);white-space:nowrap}
+.btn:hover{background:var(--gold2)}
+.state{padding:80px 0;text-align:center}
+.foot{margin-top:46px;font-size:14px}
+@media(max-width:560px){.f{flex-wrap:wrap}.btn{width:100%;text-align:center}}
+</style>
+</head>
+<body>
+<div class="top"><div class="in"><a class="logo" href="https://the2sellers.io/">The2Sellers<span>.io</span></a></div></div>
+<div class="wrap" id="app"><div class="state mut">Loading your materials…</div></div>
+<script>
+var API = 'https://the2sellers-api.onrender.com';
+var HOME = 'https://the2sellers.io/';
+function esc(s){ if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function size(b){ if (!b) return ''; if (b < 1024 * 1024) return Math.max(1, Math.round(b / 1024)) + ' KB'; return (b / 1024 / 1024).toFixed(1) + ' MB'; }
+function show(h){ document.getElementById('app').innerHTML = h; }
+function problem(t, sub){ show('<div class="state"><h1>' + esc(t) + '</h1><p class="mut">' + (sub || '') + '</p><p class="mut"><a href="' + HOME + '">Back to The2Sellers.io</a></p></div>'); }
+async function load(){
+  var t = new URLSearchParams(location.search).get('t');
+  if (!t) { problem('We could not find your materials', 'Please use the link in your booking confirmation email.'); return; }
+  try {
+    var r = await fetch(API + '/api/public/orders/' + encodeURIComponent(t) + '/materials');
+    if (r.status === 404) { problem('We could not find your materials', 'This link only works for a confirmed booking. If you think this is wrong, reply to your confirmation email.'); return; }
+    if (!r.ok) { problem('Something went wrong', 'Please refresh the page in a moment.'); return; }
+    var d = await r.json();
+    document.title = 'Your workshop materials | ' + d.event.title;
+    var head = '<div class="eb">Your workshop materials</div><h1>' + esc(d.event.title) + '</h1><p class="mut">Hello ' + esc(d.buyer_name) + '. Everything for the workshop is here. Download what you need; you can come back to this page any time.</p>' +
+      (d.event.intro ? '<div class="intro">' + esc(d.event.intro) + '</div>' : '');
+    if (!d.files.length) { show(head + '<div class="state mut">Your materials are being prepared. We will email you as soon as they are ready.</div>'); return; }
+    var groups = [], by = {};
+    d.files.forEach(function(f){ if (!by[f.section]) { by[f.section] = []; groups.push(f.section); } by[f.section].push(f); });
+    var body = groups.map(function(g){
+      return '<h2>' + esc(g) + '</h2><div class="list">' + by[g].map(function(f){
+        var href = API + '/api/public/orders/' + encodeURIComponent(t) + '/materials/' + f.id;
+        return '<div class="f"><div class="ic">' + esc(String(f.ext || 'file').toUpperCase().slice(0, 4)) + '</div><div class="fm"><div class="ft">' + esc(f.title) + '</div>' + (f.description ? '<div class="fd">' + esc(f.description) + '</div>' : '') + '<div class="fs">' + esc(f.filename) + ' · ' + size(f.size_bytes) + '</div></div><a class="btn" href="' + esc(href) + '">Download</a></div>';
+      }).join('') + '</div>';
+    }).join('');
+    show(head + body + '<p class="mut foot">These materials are for your personal use as a workshop attendee. Please don\'t share this link. Questions? Write to <a href="mailto:contact@the2sellers.io" style="color:#E8B939">contact@the2sellers.io</a>.</p>');
+  } catch (e) { problem('Something went wrong', 'Please refresh the page in a moment.'); }
+}
+load();
+</script>
+</body>
+</html>

@@ -171,6 +171,10 @@
       <div><label>Dinner add-on price</label><input type="number" id="f_dprice" min="0" step="0.01" placeholder="Leave blank for no dinner" /></div>
       <div><label>Dinner seats</label><input type="number" id="f_dcap" min="0" step="1" placeholder="0" /></div>
     </div>
+    <div class="row2">
+      <div><label>Early-bird ticket price</label><input type="number" id="f_eprice" min="0" step="0.01" placeholder="Leave blank for no early bird" /></div>
+      <div><label>Early bird ends (event's time zone)</label><input type="datetime-local" id="f_euntil" /><div class="hint">Until this moment buyers pay the early-bird price. After it, the ticket price above applies automatically, on the page, at checkout and in emails. <span id="f_ehint"></span></div></div>
+    </div>
     <label>What the ticket includes</label>
     <textarea id="f_includes" placeholder="The workshop, materials and refreshments."></textarea>
     <label>Main button text</label>
@@ -285,7 +289,7 @@ function renderList() {
       '<div class="ev-meta">' + esc(prettyDate(e.starts_at, e.timezone)) + (e.venue ? ' · ' + esc(e.venue) : '') + ' · page: ' + esc(e.slug) + '</div></div>' +
       '<span class="ev-chip ' + esc(e.status) + '">' + esc(e.status) + '</span>' +
       '<div class="ev-stat"><strong>' + e.seats_sold + ' / ' + e.capacity + '</strong> seats<br>' + esc(money(e.revenue_cents, e.currency)) + ' sold</div>' +
-      '<div class="ev-actions"><button onclick="editEvent(' + e.id + ')">Edit</button><button onclick="previewEvent(' + e.id + ')">Preview</button><button onclick="showAttendees(' + e.id + ')">Attendees</button><button style="color:#B3261E;border-color:#E0C7C9" onclick="deleteEvent(' + e.id + ')">Delete</button></div>' +
+      '<div class="ev-actions"><button onclick="editEvent(' + e.id + ')">Edit</button><button onclick="previewEvent(' + e.id + ')">Preview</button><button onclick="showAttendees(' + e.id + ')">Attendees</button><button onclick="location.href=\'/admin/event-materials.html?id=' + e.id + '\'">Materials</button><button style="color:#B3261E;border-color:#E0C7C9" onclick="deleteEvent(' + e.id + ')">Delete</button></div>' +
       '</div>';
   }).join('');
 }
@@ -335,7 +339,7 @@ function removeImage() { selectedImage = null; removeImageFlag = true; $('f_imag
 // ---- form ----
 function resetForm() {
   $('eventId').value = '';
-  ['f_slug','f_title','f_subline','f_city','f_venue','f_address','f_starts','f_ends','f_price','f_capacity','f_min','f_dprice','f_includes','f_note','f_bcaption','f_video'].forEach(function (id) { $(id).value = ''; });
+  ['f_slug','f_title','f_subline','f_city','f_venue','f_address','f_starts','f_ends','f_price','f_capacity','f_min','f_dprice','f_eprice','f_euntil','f_includes','f_note','f_bcaption','f_video'].forEach(function (id) { $(id).value = ''; });
   $('f_status').value = 'draft'; $('f_online').value = 'false'; $('f_tz').value = 'Australia/Adelaide'; $('f_currency').value = 'aud'; $('f_pnote').value = ''; $('f_featured').checked = false;
   $('f_refund').value = '7'; $('f_dcap').value = '0'; $('f_button').value = 'Reserve my seat';
   $('bt_city').checked = true; $('f_bsize').value = 'medium'; $('f_bfocus').value = 'upper'; $('f_bpos').value = 'left';
@@ -370,6 +374,9 @@ async function editEvent(id) {
   $('f_price').value = (e.ticket_price_cents / 100).toFixed(2);
   $('f_capacity').value = e.capacity; $('f_min').value = e.min_attendance; $('f_refund').value = e.refund_cutoff_days;
   $('f_dprice').value = (e.dinner_price_cents === null || e.dinner_price_cents === undefined) ? '' : (e.dinner_price_cents / 100).toFixed(2);
+  $('f_eprice').value = (e.early_price_cents === null || e.early_price_cents === undefined) ? '' : (e.early_price_cents / 100).toFixed(2);
+  $('f_euntil').value = isoToLocalInput(e.early_until, $('f_tz').value);
+  earlyHint();
   $('f_dcap').value = e.dinner_capacity;
   $('f_includes').value = e.includes_text || ''; $('f_button').value = e.button_text || 'Reserve my seat'; $('f_note').value = e.confirmation_note || '';
   (e.banner_type === 'host' ? $('bt_host') : $('bt_city')).checked = true;
@@ -383,6 +390,17 @@ async function editEvent(id) {
   $('eventForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// Shows whether the early bird is on, and checks it is cheaper than the full price.
+function earlyHint() {
+  const el = $('f_ehint'); if (!el) return;
+  const p = parseFloat($('f_price').value), e = parseFloat($('f_eprice').value), u = $('f_euntil').value;
+  if (isNaN(e)) { el.textContent = ''; return; }
+  if (!u) { el.textContent = 'Set an end date, or the early-bird price will not be used.'; return; }
+  if (!isNaN(p) && e >= p) { el.textContent = 'The early-bird price should be lower than the ticket price.'; return; }
+  const off = (!isNaN(p) && p > 0) ? Math.round((1 - e / p) * 100) : null;
+  el.textContent = (off !== null ? off + '% off. ' : '') + (new Date(zonedToIso(u, $('f_tz').value)) > new Date() ? 'Early bird is on now.' : 'This end date has passed, so the full price applies.');
+}
+['f_price', 'f_eprice', 'f_euntil'].forEach(function (id) { document.addEventListener('input', function (ev) { if (ev.target && ev.target.id === id) earlyHint(); }); });
 function dollarsToCents(v) {
   if (v === '' || v === null || v === undefined) return '';
   const n = parseFloat(v);
@@ -409,6 +427,8 @@ async function saveEvent() {
   fd.append('capacity', $('f_capacity').value); fd.append('min_attendance', $('f_min').value);
   fd.append('refund_cutoff_days', $('f_refund').value);
   fd.append('dinner_price_cents', dollarsToCents($('f_dprice').value));
+  fd.append('early_price_cents', dollarsToCents($('f_eprice').value));
+  fd.append('early_until', zonedToIso($('f_euntil').value, tz));
   fd.append('dinner_capacity', $('f_dcap').value);
   fd.append('includes_text', $('f_includes').value.trim()); fd.append('confirmation_note', $('f_note').value.trim());
   fd.append('button_text', $('f_button').value.trim());

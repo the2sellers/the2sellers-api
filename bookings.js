@@ -5,6 +5,8 @@ const crypto = require('crypto');
 const { sendMail, sendNotification, TICKET_FROM, NOTIFY_TO } = require('./email');
 const { requireAuth } = require('./auth');
 const { qrPng } = require('./qr');
+const pricing = require('./pricing');
+const materials = require('./materials');
 
 const TICKET_PAGE_URL = process.env.TICKET_PAGE_URL || 'https://the2sellers-api.onrender.com/admin/ticket.html';
 const API_PUBLIC_URL = process.env.API_PUBLIC_URL || 'https://the2sellers-api.onrender.com';
@@ -74,7 +76,11 @@ function whenText(ev) {
     const day = new Intl.DateTimeFormat('en-AU', { timeZone: ev.timezone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d);
     const t1 = new Intl.DateTimeFormat('en-AU', { timeZone: ev.timezone, hour: 'numeric', minute: '2-digit' }).format(d);
     let out = day + ', ' + t1;
-    if (ev.ends_at) out += ' to ' + new Intl.DateTimeFormat('en-AU', { timeZone: ev.timezone, hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(new Date(ev.ends_at));
+    if (ev.ends_at) {
+      const e = new Date(ev.ends_at);
+      const dayE = new Intl.DateTimeFormat('en-AU', { timeZone: ev.timezone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(e);
+      out += ' to ' + (dayE !== day ? dayE + ', ' : '') + new Intl.DateTimeFormat('en-AU', { timeZone: ev.timezone, hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(e);
+    }
     return out;
   } catch (e) { return ''; }
 }
@@ -142,13 +148,14 @@ function buildEmail(ev, name, token, codes, extra) {
     '<p><a href="' + esc(link) + '" style="background:#E8B939;color:#0F0F12;padding:12px 20px;border-radius:4px;text-decoration:none;font-weight:bold">Open my tickets</a>' +
       (info.calendar ? ' &nbsp; <a href="' + esc(info.calendar) + '" style="color:#7A5C0A;font-weight:bold">Add to calendar</a>' : '') + '</p>' +
     '<table style="width:100%;border-collapse:collapse">' + rows + '</table>' +
+    (extra.materialsUrl ? '<div style="background:#0F0F12;color:#FAFAF7;border-radius:8px;padding:18px 20px;margin:22px 0 0"><div style="font-family:Georgia,serif;font-size:18px;margin-bottom:6px">Your workshop materials</div><div style="font-size:14px;color:#D8D5CC;margin-bottom:14px">' + extra.materialsCount + ' file' + (extra.materialsCount === 1 ? '' : 's') + ' are ready in your private download area: workbooks, checklists, templates and slides.</div><a href="' + esc(extra.materialsUrl) + '" style="background:#E8B939;color:#0F0F12;padding:11px 18px;border-radius:4px;text-decoration:none;font-weight:bold">Open my workshop materials</a></div>' : '') +
     '<p style="color:#5B5D63;font-size:13px;margin-top:24px">' + esc(info.refund) + '</p>' +
     '<p style="color:#5B5D63;font-size:13px">Questions? Reply to this email or write to contact@the2sellers.io.</p></div>';
   const text = 'You are booked in, ' + name + '.\n\n' + ev.title + '\nWhen: ' + info.when + (info.timezone ? ' (' + info.timezone + ')' : '') + '\nWhere: ' + info.place +
     (info.map ? '\nMap: ' + info.map : '') + (info.includes ? '\nIncludes: ' + info.includes : '') + '\n' +
     (info.note ? '\nA note from your host:\n' + info.note + '\n' : '') +
     '\nYour booking: ' + codes.length + ' ticket' + (codes.length === 1 ? '' : 's') + (dinnerCount ? ', ' + dinnerCount + ' with dinner' : '') + '. ' + (extra.paidText ? 'Paid: ' + extra.paidText + '.' : 'Free.') + (extra.orderId ? ' Reference #' + extra.orderId + '.' : '') + '\n' +
-    'Your tickets: ' + link + '\n' + (info.calendar ? 'Add to calendar: ' + info.calendar + '\n' : '') + '\n' +
+    'Your tickets: ' + link + '\n' + (extra.materialsUrl ? 'Your workshop materials: ' + extra.materialsUrl + '\n' : '') + (info.calendar ? 'Add to calendar: ' + info.calendar + '\n' : '') + '\n' +
     codes.map(function (c) { return 'Ticket ' + c.code + (c.has_dinner ? ' (includes dinner)' : ''); }).join('\n') + '\n\n' + info.refund + '\nQuestions? Reply to this email or write to contact@the2sellers.io.\n';
   return { html: html, text: text };
 }
@@ -157,7 +164,9 @@ function buildEmail(ev, name, token, codes, extra) {
 async function afterBooking(pool, ev, name, email, token, codes, orderId, paidText) {
   let status = 'skipped';
   try {
-    const m = buildEmail(ev, name, token, codes, { orderId: orderId, paidText: paidText });
+    let mCount = 0;
+    try { mCount = await materials.countFiles(pool, ev.id); } catch (e0) { mCount = 0; }
+    const m = buildEmail(ev, name, token, codes, { orderId: orderId, paidText: paidText, materialsCount: mCount, materialsUrl: mCount ? materials.materialsLink(token) : '' });
     const r = await sendMail({ to: email, subject: 'Your ticket: ' + ev.title, html: m.html, text: m.text });
     status = r.ok ? 'sent' : (r.skipped ? 'skipped' : 'failed:' + (r.status || r.error || 'unknown'));
   } catch (e) { status = 'failed'; }
@@ -202,7 +211,7 @@ module.exports = function mountBookings(app, pool) {
       if (dq > 0 && (ev.dinner_price_cents === null || ev.dinner_price_cents === undefined)) {
         await client.query('ROLLBACK'); return res.status(400).json({ error: 'Dinner is not offered for this event.' });
       }
-      const total = ev.ticket_price_cents * qty + (dq > 0 ? (ev.dinner_price_cents || 0) * dq : 0);
+      const total = pricing.currentTicketCents(ev) * qty + (dq > 0 ? (ev.dinner_price_cents || 0) * dq : 0);
       if (total > 0) { await client.query('ROLLBACK'); return res.status(402).json({ error: 'This booking needs a payment. Online payment opens soon.' }); }
 
       const sold = (await client.query(
@@ -254,15 +263,17 @@ module.exports = function mountBookings(app, pool) {
     await ensureSchema(pool);
     if (!TOKEN_RE.test(req.params.token)) return res.status(404).json({ error: 'Not found' });
     const { rows } = await pool.query(
-      'SELECT o.id, o.buyer_name, o.buyer_email, o.status, e.title, e.city, e.venue, e.address, e.starts_at, e.ends_at, e.timezone, e.is_online, e.status AS event_status, e.refund_cutoff_days, e.confirmation_note, e.includes_text ' +
+      'SELECT o.id, o.event_id, o.buyer_name, o.buyer_email, o.status, e.title, e.city, e.venue, e.address, e.starts_at, e.ends_at, e.timezone, e.is_online, e.status AS event_status, e.refund_cutoff_days, e.confirmation_note, e.includes_text ' +
       'FROM orders o JOIN events e ON e.id = o.event_id WHERE o.public_token = $1', [req.params.token]);
     const o = rows[0];
     if (!o) return res.status(404).json({ error: 'Not found' });
     const t = await pool.query('SELECT code, has_dinner, checked_in_at FROM tickets WHERE order_id = $1 ORDER BY id ASC', [o.id]);
+    let mCount = 0;
+    try { if (o.status === 'paid') mCount = await materials.countFiles(pool, o.event_id); } catch (e0) { mCount = 0; }
     const em = String(o.buyer_email || '');
     const masked = em.length > 3 ? em.charAt(0) + '***' + em.slice(em.indexOf('@')) : '';
     res.json({
-      status: o.status, buyer_name: o.buyer_name, email: masked,
+      status: o.status, buyer_name: o.buyer_name, email: masked, materials_count: mCount,
       event: { title: o.title, city: o.city, venue: o.venue, address: o.address, starts_at: o.starts_at, ends_at: o.ends_at, timezone: o.timezone, is_online: o.is_online, status: o.event_status, map_url: mapUrl(o), note: String(o.confirmation_note || '').trim(), refund_text: refundText(o), includes: String(o.includes_text || '').trim() },
       tickets: t.rows.map(function (r) { return { code: r.code, has_dinner: r.has_dinner, checked_in: !!r.checked_in_at }; })
     });

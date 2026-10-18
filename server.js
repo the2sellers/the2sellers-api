@@ -1,4 +1,5 @@
 require('dotenv').config();
+const pricing = require('./pricing');
 const express = require('express');
 const cors = require('cors');
 const { pool, initSchema } = require('./db');
@@ -15,6 +16,7 @@ app.use(cors());
 app.use(express.json({ verify: function (req, res, buf) { req.rawBody = buf; } }));
 app.use('/admin', express.static(require('path').join(__dirname, 'admin')));
 require('./bookings')(app, pool);
+require('./materials')(app, pool);
 
 const PORT = process.env.PORT || 4000;
 
@@ -155,7 +157,7 @@ const uploadBannerImage = multer({
 const EVENT_CURRENCY_SYMBOLS = { aud: 'A$', gbp: '£', usd: 'US$', eur: '€', aed: 'AED ', cad: 'C$', nzd: 'NZ$', sgd: 'S$', pkr: 'PKR ', inr: '₹' };
 async function featuredEventSlides() {
   const { rows } = await pool.query(
-    "SELECT e.id, e.slug, e.city, e.title, e.venue, e.starts_at, e.timezone, e.is_online, e.currency, e.ticket_price_cents, e.capacity, e.banner_image_data, e.button_text, " +
+    "SELECT e.id, e.slug, e.city, e.title, e.venue, e.starts_at, e.timezone, e.is_online, e.currency, e.ticket_price_cents, e.early_price_cents, e.early_until, e.capacity, e.banner_image_data, e.button_text, " +
     "(SELECT COUNT(*)::int FROM tickets t JOIN orders o ON o.id = t.order_id WHERE t.event_id = e.id AND o.status = 'paid') AS sold " +
     "FROM events e WHERE e.status = 'published' AND e.featured_home = true AND (e.starts_at IS NULL OR e.starts_at > NOW()) " +
     "ORDER BY e.starts_at ASC NULLS LAST, e.id ASC LIMIT 3");
@@ -171,14 +173,15 @@ async function featuredEventSlides() {
       }
     } catch (e) { when = ''; }
     const cur = String(r.currency || 'aud').toLowerCase();
-    const price = r.ticket_price_cents ? (EVENT_CURRENCY_SYMBOLS[cur] !== undefined ? EVENT_CURRENCY_SYMBOLS[cur] : cur.toUpperCase() + ' ') + (r.ticket_price_cents / 100).toLocaleString('en-AU') : 'Free';
+    const nowCents = pricing.currentTicketCents(r);
+    const price = nowCents ? (pricing.earlyActive(r) ? 'Early bird ' : '') + (EVENT_CURRENCY_SYMBOLS[cur] !== undefined ? EVENT_CURRENCY_SYMBOLS[cur] : cur.toUpperCase() + ' ') + (nowCents / 100).toLocaleString('en-AU') : 'Free';
     const parts = [when, r.is_online ? 'Live online' : r.venue, price].filter(Boolean);
     return {
       id: 'event-' + r.id,
       label: r.is_online ? 'LIVE ONLINE' : 'LIVE IN ' + String(r.city || '').toUpperCase(),
       head: r.title,
       sub: parts.join(' · '),
-      badge: left <= 20 ? 'Only ' + left + ' seat' + (left === 1 ? '' : 's') + ' left' : (r.ticket_price_cents ? '' : 'Free'),
+      badge: left <= 20 ? 'Only ' + left + ' seat' + (left === 1 ? '' : 's') + ' left' : (nowCents ? '' : 'Free'),
       dest: site + '/events/' + r.slug,
       cta: r.button_text || 'Reserve my seat',
       layout: r.banner_image_data ? 'background' : 'text',
@@ -657,8 +660,8 @@ app.delete('/api/admin/blog-posts/:id', requireAuth, requireAdmin, ah(async (req
 // EVENTS: ticketed seminars and online sessions
 // ============================================================
 
-const EVENT_TEXT_FIELDS = ['confirmation_note', 'city', 'title', 'subline', 'venue', 'address', 'timezone', 'currency', 'price_note', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'banner_caption', 'intro_video_url', 'button_text', 'includes_text', 'starts_at', 'ends_at'];
-const EVENT_INT_FIELDS = ['ticket_price_cents', 'dinner_price_cents', 'dinner_capacity', 'capacity', 'min_attendance', 'refund_cutoff_days', 'banner_overlay'];
+const EVENT_TEXT_FIELDS = ['confirmation_note', 'city', 'title', 'subline', 'venue', 'address', 'timezone', 'currency', 'price_note', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'banner_caption', 'intro_video_url', 'button_text', 'includes_text', 'starts_at', 'ends_at', 'early_until'];
+const EVENT_INT_FIELDS = ['ticket_price_cents', 'early_price_cents', 'dinner_price_cents', 'dinner_capacity', 'capacity', 'min_attendance', 'refund_cutoff_days', 'banner_overlay'];
 const EVENT_REQUIRED = ['city', 'title', 'timezone', 'currency', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'button_text', 'ticket_price_cents', 'dinner_capacity', 'capacity', 'min_attendance', 'refund_cutoff_days', 'banner_overlay'];
 const EVENT_ENUMS = {
   currency: ['aud', 'gbp', 'usd', 'eur', 'aed', 'cad', 'nzd', 'sgd', 'pkr', 'inr'],
@@ -715,6 +718,8 @@ function publicEvent(r, withImage) {
     venue: r.venue, address: r.address, starts_at: r.starts_at, ends_at: r.ends_at,
     timezone: r.timezone, currency: r.currency, price_note: r.price_note, is_online: r.is_online, status: r.status,
     ticket_price_cents: r.ticket_price_cents, dinner_price_cents: r.dinner_price_cents,
+    early_price_cents: r.early_price_cents, early_until: r.early_until,
+    early_active: pricing.earlyActive(r), current_price_cents: pricing.currentTicketCents(r),
     banner_type: r.banner_type, banner_size: r.banner_size, banner_focus: r.banner_focus,
     banner_overlay: r.banner_overlay, banner_text_pos: r.banner_text_pos,
     banner_caption: r.banner_caption, intro_video_url: r.intro_video_url,
