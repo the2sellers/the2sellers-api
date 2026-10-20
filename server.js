@@ -660,7 +660,7 @@ app.delete('/api/admin/blog-posts/:id', requireAuth, requireAdmin, ah(async (req
 // EVENTS: ticketed seminars and online sessions
 // ============================================================
 
-const EVENT_TEXT_FIELDS = ['confirmation_note', 'city', 'title', 'subline', 'venue', 'address', 'timezone', 'currency', 'price_note', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'banner_caption', 'intro_video_url', 'button_text', 'includes_text', 'starts_at', 'ends_at', 'early_until'];
+const EVENT_TEXT_FIELDS = ['confirmation_note', 'city', 'title', 'subline', 'venue', 'address', 'timezone', 'currency', 'price_note', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'banner_caption', 'intro_video_url', 'button_text', 'includes_text', 'starts_at', 'ends_at', 'early_until', 'event_type'];
 const EVENT_INT_FIELDS = ['ticket_price_cents', 'early_price_cents', 'dinner_price_cents', 'dinner_capacity', 'capacity', 'min_attendance', 'refund_cutoff_days', 'banner_overlay'];
 const EVENT_REQUIRED = ['city', 'title', 'timezone', 'currency', 'status', 'banner_type', 'banner_size', 'banner_focus', 'banner_text_pos', 'button_text', 'ticket_price_cents', 'dinner_capacity', 'capacity', 'min_attendance', 'refund_cutoff_days', 'banner_overlay'];
 const EVENT_ENUMS = {
@@ -669,7 +669,8 @@ const EVENT_ENUMS = {
   banner_type: ['city', 'host'],
   banner_size: ['small', 'medium', 'large'],
   banner_focus: ['top', 'upper', 'center', 'bottom'],
-  banner_text_pos: ['left', 'centre']
+  banner_text_pos: ['left', 'centre'],
+  event_type: ['workshop', 'meetup', 'chai', 'dinner']
 };
 
 // Only whitelisted fields ever reach the database. Blank values become NULL
@@ -723,7 +724,7 @@ function publicEvent(r, withImage) {
     banner_type: r.banner_type, banner_size: r.banner_size, banner_focus: r.banner_focus,
     banner_overlay: r.banner_overlay, banner_text_pos: r.banner_text_pos,
     banner_caption: r.banner_caption, intro_video_url: r.intro_video_url,
-    button_text: r.button_text, includes_text: r.includes_text,
+    button_text: r.button_text, includes_text: r.includes_text, event_type: r.event_type || null,
     agenda: r.agenda, faq: r.faq,
     refund_cutoff_days: r.refund_cutoff_days, min_attendance: r.min_attendance,
     seats_left: Math.max(0, r.capacity - r.seats_sold),

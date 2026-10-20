@@ -98,6 +98,18 @@
     <input type="hidden" id="eventId" value="" />
 
     <div class="row2">
+      <div><label>Type of event</label>
+        <select id="f_type">
+          <option value="workshop">Workshop or seminar (paid)</option>
+          <option value="meetup">Community meetup (free)</option>
+          <option value="chai">Chai Gup Shup (paid)</option>
+          <option value="dinner">Community dinner (paid)</option>
+        </select>
+        <div class="hint">Sets the wording on the event page ("Is this for you?", the ticket box and "Our promise to you"). Set the price below.</div></div>
+      <div></div>
+    </div>
+
+    <div class="row2">
       <div><label>Status</label>
         <select id="f_status">
           <option value="draft">Draft (hidden)</option>
@@ -340,7 +352,7 @@ function removeImage() { selectedImage = null; removeImageFlag = true; $('f_imag
 function resetForm() {
   $('eventId').value = '';
   ['f_slug','f_title','f_subline','f_city','f_venue','f_address','f_starts','f_ends','f_price','f_capacity','f_min','f_dprice','f_eprice','f_euntil','f_includes','f_note','f_bcaption','f_video'].forEach(function (id) { $(id).value = ''; });
-  $('f_status').value = 'draft'; $('f_online').value = 'false'; $('f_tz').value = 'Australia/Adelaide'; $('f_currency').value = 'aud'; $('f_pnote').value = ''; $('f_featured').checked = false;
+  $('f_status').value = 'draft'; $('f_type').value = 'workshop'; $('f_online').value = 'false'; $('f_tz').value = 'Australia/Adelaide'; $('f_currency').value = 'aud'; $('f_pnote').value = ''; $('f_featured').checked = false;
   $('f_refund').value = '7'; $('f_dcap').value = '0'; $('f_button').value = 'Reserve my seat';
   $('bt_city').checked = true; $('f_bsize').value = 'medium'; $('f_bfocus').value = 'upper'; $('f_bpos').value = 'left';
   $('f_boverlay').value = 60; $('ovVal').textContent = '60';
@@ -363,7 +375,7 @@ async function editEvent(id) {
   resetForm();
   $('formTitle').textContent = 'Edit event';
   $('eventId').value = e.id;
-  $('f_status').value = e.status; $('f_slug').value = e.slug || '';
+  $('f_status').value = e.status; $('f_slug').value = e.slug || ''; $('f_type').value = e.event_type || (e.ticket_price_cents ? 'workshop' : 'meetup');
   $('f_title').value = e.title || ''; $('f_subline').value = e.subline || '';
   $('f_city').value = e.city || ''; $('f_venue').value = e.venue || ''; $('f_address').value = e.address || '';
   $('f_online').value = e.is_online ? 'true' : 'false';
@@ -400,6 +412,15 @@ function earlyHint() {
   const off = (!isNaN(p) && p > 0) ? Math.round((1 - e / p) * 100) : null;
   el.textContent = (off !== null ? off + '% off. ' : '') + (new Date(zonedToIso(u, $('f_tz').value)) > new Date() ? 'Early bird is on now.' : 'This end date has passed, so the full price applies.');
 }
+document.addEventListener('change', function (ev) {
+  if (!ev.target || ev.target.id !== 'f_type') return;
+  var t = ev.target.value, b = $('f_button');
+  var defaults = ['', 'Reserve my seat', 'Reserve my free seat', 'Reserve my place at dinner'];
+  if (t === 'meetup') { $('f_price').value = '0.00'; if (defaults.indexOf(b.value.trim()) >= 0) b.value = 'Reserve my free seat'; }
+  else if (t === 'dinner') { if (defaults.indexOf(b.value.trim()) >= 0) b.value = 'Reserve my place at dinner'; }
+  else { if (defaults.indexOf(b.value.trim()) >= 0) b.value = 'Reserve my seat'; }
+  if (typeof earlyHint === 'function') earlyHint();
+});
 ['f_price', 'f_eprice', 'f_euntil'].forEach(function (id) { document.addEventListener('input', function (ev) { if (ev.target && ev.target.id === id) earlyHint(); }); });
 function dollarsToCents(v) {
   if (v === '' || v === null || v === undefined) return '';
@@ -414,7 +435,7 @@ async function saveEvent() {
   if (!city || !title) { alert('City and headline are required.'); return; }
   const tz = $('f_tz').value;
   const fd = new FormData();
-  fd.append('status', $('f_status').value);
+  fd.append('status', $('f_status').value); fd.append('event_type', $('f_type').value);
   fd.append('slug', $('f_slug').value.trim());
   fd.append('title', title); fd.append('subline', $('f_subline').value.trim());
   fd.append('city', city); fd.append('venue', $('f_venue').value.trim()); fd.append('address', $('f_address').value.trim());
