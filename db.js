@@ -245,6 +245,7 @@ async function initSchema() {
   await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS early_price_cents INTEGER');
   await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS early_until TIMESTAMPTZ');
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS event_type TEXT;`);
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS venue_image_data TEXT;`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS host_profile (
       id INTEGER PRIMARY KEY DEFAULT 1,

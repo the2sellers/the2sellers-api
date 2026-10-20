@@ -101,6 +101,7 @@
       <div><label>Type of event</label>
         <select id="f_type">
           <option value="workshop">Workshop or seminar (paid)</option>
+          <option value="free_workshop">Workshop or seminar (free)</option>
           <option value="meetup">Community meetup (free)</option>
           <option value="chai">Chai Gup Shup (paid)</option>
           <option value="dinner">Community dinner (paid)</option>
@@ -135,6 +136,20 @@
     </div>
     <label>Address</label>
     <input type="text" id="f_address" placeholder="Street address and suburb" />
+    <label>Venue photo</label>
+    <div id="venueBox" class="hint" style="margin-top:0">
+      <div id="venueNew">Save the event first, then add a photo of the venue.</div>
+      <div id="venueEdit" style="display:none">
+        <img id="venuePrev" alt="Venue photo" style="display:none;max-width:320px;width:100%;border-radius:8px;margin:6px 0 8px;border:1px solid #E7E3D8" />
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input type="file" id="f_venueimg" accept="image/jpeg,image/png,image/webp" style="max-width:260px" />
+          <button type="button" class="btn-secondary" onclick="uploadVenue()">Upload photo</button>
+          <button type="button" class="btn-secondary" id="venueDel" onclick="removeVenue()" style="display:none">Remove photo</button>
+          <span id="venueState"></span>
+        </div>
+        <div>Shown on the event page and on the event card in the events list. Use your own photo or one the venue has allowed you to use.</div>
+      </div>
+    </div>
     <div class="row3">
       <div><label>Start date and time</label><input type="datetime-local" id="f_starts" /></div>
       <div><label>End date and time</label><input type="datetime-local" id="f_ends" /></div>
@@ -357,6 +372,7 @@ function resetForm() {
   $('bt_city').checked = true; $('f_bsize').value = 'medium'; $('f_bfocus').value = 'upper'; $('f_bpos').value = 'left';
   $('f_boverlay').value = 60; $('ovVal').textContent = '60';
   selectedImage = null; removeImageFlag = false; $('f_image').value = ''; $('imgPrev').style.display = 'none';
+  showVenue(null, false);
   $('agendaRows').innerHTML = ''; $('faqRows').innerHTML = '';
 }
 function openForm() {
@@ -376,6 +392,7 @@ async function editEvent(id) {
   $('formTitle').textContent = 'Edit event';
   $('eventId').value = e.id;
   $('f_status').value = e.status; $('f_slug').value = e.slug || ''; $('f_type').value = e.event_type || (e.ticket_price_cents ? 'workshop' : 'meetup');
+  showVenue(e.id, e.has_venue_image);
   $('f_title').value = e.title || ''; $('f_subline').value = e.subline || '';
   $('f_city').value = e.city || ''; $('f_venue').value = e.venue || ''; $('f_address').value = e.address || '';
   $('f_online').value = e.is_online ? 'true' : 'false';
@@ -416,7 +433,7 @@ document.addEventListener('change', function (ev) {
   if (!ev.target || ev.target.id !== 'f_type') return;
   var t = ev.target.value, b = $('f_button');
   var defaults = ['', 'Reserve my seat', 'Reserve my free seat', 'Reserve my place at dinner'];
-  if (t === 'meetup') { $('f_price').value = '0.00'; if (defaults.indexOf(b.value.trim()) >= 0) b.value = 'Reserve my free seat'; }
+  if (t === 'meetup' || t === 'free_workshop') { $('f_price').value = '0.00'; if (defaults.indexOf(b.value.trim()) >= 0) b.value = 'Reserve my free seat'; }
   else if (t === 'dinner') { if (defaults.indexOf(b.value.trim()) >= 0) b.value = 'Reserve my place at dinner'; }
   else { if (defaults.indexOf(b.value.trim()) >= 0) b.value = 'Reserve my seat'; }
   if (typeof earlyHint === 'function') earlyHint();
@@ -427,6 +444,36 @@ function dollarsToCents(v) {
   const n = parseFloat(v);
   if (isNaN(n) || n < 0) return '';
   return String(Math.round(n * 100));
+}
+
+async function showVenue(id, has) {
+  $('venueNew').style.display = id ? 'none' : 'block';
+  $('venueEdit').style.display = id ? 'block' : 'none';
+  $('venueState').textContent = ''; $('f_venueimg').value = '';
+  $('venueDel').style.display = has ? 'inline-block' : 'none';
+  const img = $('venuePrev');
+  if (img.src && img.src.indexOf('blob:') === 0) URL.revokeObjectURL(img.src);
+  img.style.display = 'none'; img.removeAttribute('src');
+  if (id && has) {
+    try {
+      const r = await fetch(API + '/api/admin/events/' + id + '/venue-image', { headers: { 'Authorization': 'Bearer ' + token } });
+      if (r.ok) { img.src = URL.createObjectURL(await r.blob()); img.style.display = 'block'; }
+    } catch (e) {}
+  }
+}
+async function uploadVenue() {
+  const id = $('eventId').value, f = $('f_venueimg').files[0];
+  if (!id || !f) { $('venueState').textContent = 'Choose a photo first.'; return; }
+  const fd = new FormData(); fd.append('image', f);
+  $('venueState').textContent = 'Uploading…';
+  const r = await fetch(API + '/api/admin/events/' + id + '/venue-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
+  if (!r.ok) { let m = 'Upload failed.'; try { m = (await r.json()).error || m; } catch (e) {} $('venueState').textContent = m; return; }
+  await showVenue(id, true); $('venueState').textContent = 'Photo saved.';
+}
+async function removeVenue() {
+  const id = $('eventId').value; if (!id) return;
+  await fetch(API + '/api/admin/events/' + id + '/venue-image', { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+  await showVenue(id, false); $('venueState').textContent = 'Photo removed.';
 }
 
 async function saveEvent() {

@@ -670,7 +670,7 @@ const EVENT_ENUMS = {
   banner_size: ['small', 'medium', 'large'],
   banner_focus: ['top', 'upper', 'center', 'bottom'],
   banner_text_pos: ['left', 'centre'],
-  event_type: ['workshop', 'meetup', 'chai', 'dinner']
+  event_type: ['workshop', 'free_workshop', 'meetup', 'chai', 'dinner']
 };
 
 // Only whitelisted fields ever reach the database. Blank values become NULL
@@ -730,6 +730,8 @@ function publicEvent(r, withImage) {
     seats_left: Math.max(0, r.capacity - r.seats_sold),
     dinner_left: (r.dinner_price_cents !== null && r.dinner_price_cents !== undefined) ? Math.max(0, r.dinner_capacity - r.dinner_sold) : 0
   };
+  o.has_banner_image = !!r.banner_image_data;
+  o.has_venue_image = !!r.venue_image_data;
   if (withImage) o.banner_image_data = r.banner_image_data;
   return o;
 }
@@ -750,7 +752,9 @@ app.get('/api/admin/events', requireAuth, ah(async (req, res) => {
   res.json(rows.map((r) => {
     const o = Object.assign({}, r);
     o.has_image = !!r.banner_image_data;
+    o.has_venue_image = !!r.venue_image_data;
     delete o.banner_image_data;
+    delete o.venue_image_data;
     return o;
   }));
 }));
@@ -758,8 +762,61 @@ app.get('/api/admin/events', requireAuth, ah(async (req, res) => {
 app.get('/api/admin/events/:id', requireAuth, ah(async (req, res) => {
   const { rows } = await pool.query(EVENT_SALES_SQL + ' WHERE e.id = $1', [req.params.id]);
   if (!rows[0]) return res.status(404).json({ error: 'Event not found' });
-  res.json(rows[0]);
+  const o = Object.assign({}, rows[0]);
+  o.has_venue_image = !!o.venue_image_data;
+  delete o.venue_image_data;
+  res.json(o);
 }));
+
+// ---------- Venue photo: one per event, shown on the event page and on the events list cards ----------
+const uploadVenueImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 12 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPG, PNG or WEBP photos are allowed.'));
+  }
+});
+app.post('/api/admin/events/:id/venue-image', requireAuth, uploadVenueImage.single('image'), ah(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Choose a photo first.' });
+  let buf;
+  try {
+    buf = await require('sharp')(req.file.buffer).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toBuffer();
+  } catch (e) { return res.status(400).json({ error: 'That file could not be read as a photo.' }); }
+  const { rowCount } = await pool.query('UPDATE events SET venue_image_data = $1, updated_at = NOW() WHERE id = $2', ['data:image/jpeg;base64,' + buf.toString('base64'), req.params.id]);
+  if (!rowCount) return res.status(404).json({ error: 'Event not found' });
+  res.json({ ok: true });
+}));
+app.delete('/api/admin/events/:id/venue-image', requireAuth, ah(async (req, res) => {
+  await pool.query('UPDATE events SET venue_image_data = NULL, updated_at = NOW() WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+app.get('/api/admin/events/:id/venue-image', requireAuth, ah(async (req, res) => {
+  const { rows } = await pool.query('SELECT venue_image_data FROM events WHERE id = $1', [req.params.id]);
+  const m = rows[0] && /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/is.exec(rows[0].venue_image_data || '');
+  if (!m) return res.status(404).end();
+  res.set('Content-Type', m[1]); res.set('Cache-Control', 'no-store');
+  res.send(Buffer.from(m[2], 'base64'));
+}));
+// Public images: the venue photo, and a card image for the events list (venue photo, else the banner).
+async function sendEventImage(req, res, which, w, h) {
+  const { rows } = await pool.query("SELECT venue_image_data, banner_image_data FROM events WHERE slug = $1 AND status IN ('published', 'closed')", [req.params.slug]);
+  const r = rows[0];
+  const data = r && (which === 'venue' ? r.venue_image_data : (r.venue_image_data || r.banner_image_data));
+  const m = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/is.exec(data || '');
+  if (!m) return res.status(404).end();
+  res.set('Cache-Control', 'public, max-age=3600');
+  try {
+    const out = await require('sharp')(Buffer.from(m[2], 'base64')).resize(w, h, { fit: 'cover', position: 'attention' }).jpeg({ quality: 78 }).toBuffer();
+    res.set('Content-Type', 'image/jpeg');
+    return res.send(out);
+  } catch (e) {
+    res.set('Content-Type', m[1]);
+    return res.send(Buffer.from(m[2], 'base64'));
+  }
+}
+app.get('/api/public/events/:slug/venue-image', ah(async (req, res) => sendEventImage(req, res, 'venue', 1400, 788)));
+app.get('/api/public/events/:slug/card-image', ah(async (req, res) => sendEventImage(req, res, 'card', 800, 450)));
 
 app.post('/api/admin/events', requireAuth, uploadBannerImage.single('image'), ah(async (req, res) => {
   const d = cleanEventBody(req.body);

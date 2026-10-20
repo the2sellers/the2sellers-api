@@ -79,6 +79,9 @@ a{color:inherit}
 .stats span{display:block;color:var(--mut);font-size:12px;letter-spacing:.18em;text-transform:uppercase;margin-top:10px}
 /* for you */
 .two{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.venue{display:grid;grid-template-columns:1.25fr 1fr;gap:48px;align-items:center}
+.venue img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;display:block}
+@media(max-width:900px){.venue{grid-template-columns:1fr;gap:28px}}
 .two h3{font-size:26px;margin-bottom:18px}
 .two .row{display:flex;gap:14px;margin-top:16px}
 .two svg{flex:none;margin-top:3px}
@@ -397,6 +400,9 @@ function render(others, proof){
     meetup: { eb: 'Free community event',
       yes: ['You sell online, or want to start, and want to learn from people who are doing it.', 'You have a problem, an idea or some progress to share.', 'You want to meet the people building online businesses in ' + cityName + '.'],
       no: ['You are looking for a get-rich-quick system.', 'You are coming only to sell your services to everyone in the room.', 'You want a lecture with no chance to take part. This is a conversation.'] },
+    free_workshop: { eb: 'Free workshop',
+      yes: ['You want to learn a practical skill step by step, from someone who does it every day.', 'You are starting out, or want to fill the gaps in what you already know.', 'You are ready to take notes and act on what you learn.'],
+      no: ['You are looking for a get-rich-quick system.', 'You expect a free event to be a sales pitch. It is not.', 'You want motivation only, not practical steps.'] },
     chai: { eb: 'Chai Gup Shup',
       yes: ['You want to sit down with Bilal and other sellers over chai and talk honestly about your business.', 'You have questions about your account, products, ads or next steps.', 'You prefer a small, relaxed conversation to a big stage.'],
       no: ['You are looking for a get-rich-quick system.', 'You are coming only to sell your services to everyone at the table.', 'You want a formal lecture. This is an open conversation.'] },
@@ -420,6 +426,15 @@ function render(others, proof){
   }
 
   // What ticket holders download: file titles only, grouped by section.
+  var venueKnown = !ev.is_online && ev.venue && !/^(tba|tbc|to be (announced|confirmed))$/i.test(String(ev.venue).trim());
+  var venueImg = ev.has_venue_image ? API + '/api/public/events/' + encodeURIComponent(ev.slug) + '/venue-image' : '';
+  var venueMap = venueKnown ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([ev.venue, ev.address, ev.city].filter(Boolean).join(', ')) : '';
+  var venueHtml = (venueKnown || venueImg) ? '<section class="sec l"><div class="wrap' + (venueImg ? ' venue' : '') + '">' +
+    (venueImg ? '<img src="' + esc(venueImg) + '" alt="' + esc((venueKnown ? ev.venue : cityName) + ', the venue') + '" loading="lazy">' : '') +
+    '<div><div class="eb">The venue</div><h2 class="h2" style="margin:14px 0 18px">' + esc(venueKnown ? ev.venue : 'In ' + cityName) + '</h2>' +
+    (ev.address ? '<p class="mut" style="font-size:18px;margin:0 0 24px">' + esc(ev.address) + '</p>' : '') +
+    (venueMap ? '<a class="btn" href="' + esc(venueMap) + '" target="_blank" rel="noopener">Open in Google Maps</a>' : '') +
+    '</div></div></section>' : '';
   var mats = '';
   var mf = (MATS && MATS.files) || [];
   if (mf.length) {
@@ -447,7 +462,7 @@ function render(others, proof){
     (ev.seats_left > 0 && ev.status !== 'closed' ? '<p class="left2">' + ev.seats_left + ' seat' + (ev.seats_left === 1 ? '' : 's') + ' left</p>' : '') + '</div>';
 
   var included = ev.includes_text ? '<p class="mut" style="font-size:18px">' + esc(ev.includes_text) + '</p>' : '';
-  var tickets = '<section class="sec l" id="tickets"><div class="wrap tk"><div><div class="eb">Your seat</div><h2 class="h2" style="margin:14px 0 22px">' + ({ meetup: 'Free to attend. Just reserve your seat.', chai: 'Reserve your seat at the table.', dinner: 'Reserve your place at dinner.' }[kind] || (free ? 'Free to attend. Just reserve your seat.' : 'One ticket. Everything included.')) + '</h2>' + included +
+  var tickets = '<section class="sec l" id="tickets"><div class="wrap tk"><div><div class="eb">Your seat</div><h2 class="h2" style="margin:14px 0 22px">' + ({ meetup: 'Free to attend. Just reserve your seat.', free_workshop: 'Free to attend. Just reserve your seat.', chai: 'Reserve your seat at the table.', dinner: 'Reserve your place at dinner.' }[kind] || (free ? 'Free to attend. Just reserve your seat.' : 'One ticket. Everything included.')) + '</h2>' + included +
     '<ul><li>' + CHECK + '<span>' + esc(wh) + '</span></li><li>' + CHECK + '<span>' + esc(place || 'Venue to be announced') + '</span></li>' +
     '<li>' + CHECK + '<span>Your ticket is emailed to you with a QR code</span></li>' +
     '<li>' + CHECK + '<span>' + (free ? 'Free for everyone. No payment, no card details' : 'Refund rules stated before you pay') + '</span></li></ul></div>' + buy + '</div></section>';
@@ -460,6 +475,7 @@ function render(others, proof){
     '</div></div></section>';
   var PROMISE = {
     meetup: [['TAG', 'Free, no catches', 'No ticket price, no payment and no card details. Just reserve your seat.'], ['BELL', 'If plans change, you will know', 'If the date or venue changes, everyone who registered hears from us by email and WhatsApp.'], ['SHIELD', 'Nothing sold in the room', 'A community gathering, not a sales event. Come to share, learn and connect.']],
+    free_workshop: [['TAG', 'Free, no catches', 'No ticket price, no payment and no card details. Just reserve your seat.'], ['BELL', 'If plans change, you will know', 'If the date or venue changes, everyone who registered hears from us by email and WhatsApp.'], ['SHIELD', 'Real teaching, no pitch', 'Practical steps you can use straight away. Nothing is sold in the room.']],
     chai: [['RET', 'A clear refund rule', refundTxt], ['USERS', 'Small and personal', 'Seats are limited so everyone gets time to talk and ask questions.'], ['SHIELD', 'Nothing sold at the table', 'An honest conversation over chai, not a sales pitch.']],
     dinner: [['RET', 'A clear refund rule', refundTxt], ['TAG', 'The price is the whole price', 'What you pay is shown before you book. No hidden extras on the night.'], ['SHIELD', 'Nothing sold at dinner', 'A community evening, not a sales event. Come to eat, share and connect.']]
   };
@@ -483,7 +499,7 @@ function render(others, proof){
   var top = (isPreview ? '<div class="pvbar">Preview. This is how the page looks. Status: ' + esc(ev.status) + '</div>' : '') +
     '<header class="top"><div class="wrap"><a class="logo" href="' + esc(HOME_URL) + '">The2Sellers<span>.io</span></a>' + pills + '<a class="btn' + (s.open ? '' : ' off') + '" href="#tickets">' + btnText + '</a></div></header>';
 
-  document.getElementById('app').innerHTML = top + hero + stats + pressHtml + foryou + agenda + mats + hostHtml + reviewsHtml + tickets + promise + faq + final + foot + sbar;
+  document.getElementById('app').innerHTML = top + hero + stats + pressHtml + foryou + agenda + mats + hostHtml + reviewsHtml + venueHtml + tickets + promise + faq + final + foot + sbar;
   document.title = ev.title + ' | ' + cityName + ' | The2Sellers.io';
   wireBuy(maxQ, dinnerOn, s);
 }
