@@ -97,6 +97,9 @@ function mapUrl(ev) {
   return q ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q) : '';
 }
 function refundText(ev) {
+  if (ev.ticket_price_cents !== undefined && ev.ticket_price_cents !== null && Number(ev.ticket_price_cents) === 0 && !(Number(ev.dinner_price_cents) > 0)) {
+    return 'Can\'t make it after all? Please reply to your confirmation email so we can give your seat to someone else.';
+  }
   const d = parseInt(ev.refund_cutoff_days, 10) || 0;
   return d > 0
     ? 'Refunds: full refund if you cancel at least ' + d + ' day' + (d === 1 ? '' : 's') + ' before the event. Just reply to your confirmation email.'
@@ -263,7 +266,7 @@ module.exports = function mountBookings(app, pool) {
     await ensureSchema(pool);
     if (!TOKEN_RE.test(req.params.token)) return res.status(404).json({ error: 'Not found' });
     const { rows } = await pool.query(
-      'SELECT o.id, o.event_id, o.buyer_name, o.buyer_email, o.status, e.title, e.city, e.venue, e.address, e.starts_at, e.ends_at, e.timezone, e.is_online, e.status AS event_status, e.refund_cutoff_days, e.confirmation_note, e.includes_text ' +
+      'SELECT o.id, o.event_id, o.buyer_name, o.buyer_email, o.status, e.title, e.city, e.venue, e.address, e.starts_at, e.ends_at, e.timezone, e.is_online, e.status AS event_status, e.refund_cutoff_days, e.ticket_price_cents, e.dinner_price_cents, e.confirmation_note, e.includes_text ' +
       'FROM orders o JOIN events e ON e.id = o.event_id WHERE o.public_token = $1', [req.params.token]);
     const o = rows[0];
     if (!o) return res.status(404).json({ error: 'Not found' });
@@ -282,7 +285,7 @@ module.exports = function mountBookings(app, pool) {
   // ---- Admin: everything about the bookings for one event (for the attendee list, CSV and WhatsApp) ----
   app.get('/api/admin/events/:id/bookings', requireAuth, ah(async function (req, res) {
     await ensureSchema(pool);
-    const er = await pool.query('SELECT id, title, city, venue, address, starts_at, ends_at, timezone, is_online, currency, refund_cutoff_days, confirmation_note, includes_text FROM events WHERE id = $1', [req.params.id]);
+    const er = await pool.query('SELECT id, title, city, venue, address, starts_at, ends_at, timezone, is_online, currency, refund_cutoff_days, ticket_price_cents, dinner_price_cents, confirmation_note, includes_text FROM events WHERE id = $1', [req.params.id]);
     const ev = er.rows[0];
     if (!ev) return res.status(404).json({ error: 'Event not found' });
     const orders = (await pool.query(

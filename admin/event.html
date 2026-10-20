@@ -382,7 +382,7 @@ function render(others, proof){
 
   var stats = '<section class="stats m"><div class="wrap"><div><b>10,000+</b><span>Clients served</span></div><div><b>1,800+</b><span>Accounts reinstated</span></div><div><b>50+</b><span>Specialists, UK &amp; PK</span></div><div><b>12</b><span>Marketplaces mastered</span></div></div></section>';
 
-  var foryou = '<section class="sec l"><div class="wrap"><div class="eb">Be honest with yourself</div><h2 class="h2" style="margin:14px 0 44px">Is this for you?</h2><div class="two">' +
+  var foryouPaid = '<section class="sec l"><div class="wrap"><div class="eb">Be honest with yourself</div><h2 class="h2" style="margin:14px 0 44px">Is this for you?</h2><div class="two">' +
     '<div class="card"><h3>This is for you if</h3>' +
     '<div class="row">' + CHECK + '<p>You are starting from zero, or you already sell and want to do Amazon properly.</p></div>' +
     '<div class="row">' + CHECK + '<p>You want to understand every step: business set-up, accounts, products, shipping and advertising.</p></div>' +
@@ -392,6 +392,17 @@ function render(others, proof){
     '<div class="row">' + CROSS + '<p>You are looking for a get-rich-quick system.</p></div>' +
     '<div class="row">' + CROSS + '<p>You expect a coaching package to be sold to you in the room. There isn\'t one.</p></div></div>' +
     '</div></div></section>';
+  var foryouFree = '<section class="sec l"><div class="wrap"><div class="eb">Free community event</div><h2 class="h2" style="margin:14px 0 44px">Is this for you?</h2><div class="two">' +
+    '<div class="card"><h3>This is for you if</h3>' +
+    '<div class="row">' + CHECK + '<p>You sell online, or want to start, and want to learn from people who are doing it.</p></div>' +
+    '<div class="row">' + CHECK + '<p>You have a problem, an idea or some progress to share.</p></div>' +
+    '<div class="row">' + CHECK + '<p>You want to meet the people building online businesses in ' + esc(cityName) + '.</p></div></div>' +
+    '<div class="card"><h3>This is not for you if</h3>' +
+    '<div class="row">' + CROSS + '<p>You are looking for a get-rich-quick system.</p></div>' +
+    '<div class="row">' + CROSS + '<p>You are coming only to sell your services to everyone in the room.</p></div>' +
+    '<div class="row">' + CROSS + '<p>You want a lecture with no chance to take part. This is a conversation.</p></div></div>' +
+    '</div></div></section>';
+  var foryou = free ? foryouFree : foryouPaid;
 
   var agenda = '';
   var ag = (ev.agenda || []).filter(function(a){ return a && (a.title || a.time || a.text); });
@@ -428,17 +439,23 @@ function render(others, proof){
     (ev.seats_left > 0 && ev.status !== 'closed' ? '<p class="left2">' + ev.seats_left + ' seat' + (ev.seats_left === 1 ? '' : 's') + ' left</p>' : '') + '</div>';
 
   var included = ev.includes_text ? '<p class="mut" style="font-size:18px">' + esc(ev.includes_text) + '</p>' : '';
-  var tickets = '<section class="sec l" id="tickets"><div class="wrap tk"><div><div class="eb">Your seat</div><h2 class="h2" style="margin:14px 0 22px">One ticket. Everything included.</h2>' + included +
+  var tickets = '<section class="sec l" id="tickets"><div class="wrap tk"><div><div class="eb">Your seat</div><h2 class="h2" style="margin:14px 0 22px">' + (free ? 'Free to attend. Just reserve your seat.' : 'One ticket. Everything included.') + '</h2>' + included +
     '<ul><li>' + CHECK + '<span>' + esc(wh) + '</span></li><li>' + CHECK + '<span>' + esc(place || 'Venue to be announced') + '</span></li>' +
     '<li>' + CHECK + '<span>Your ticket is emailed to you with a QR code</span></li>' +
-    '<li>' + CHECK + '<span>Refund rules stated before you pay</span></li></ul></div>' + buy + '</div></section>';
+    '<li>' + CHECK + '<span>' + (free ? 'Free for everyone. No payment, no card details' : 'Refund rules stated before you pay') + '</span></li></ul></div>' + buy + '</div></section>';
 
   var refundTxt = ev.refund_cutoff_days > 0 ? 'Full refund up to ' + ev.refund_cutoff_days + ' day' + (ev.refund_cutoff_days === 1 ? '' : 's') + ' before the event. Stated before you pay.' : 'Our refund rule is stated before you pay.';
-  var promise = '<section class="sec m" style="padding:80px 0"><div class="wrap"><h2 class="h2" style="text-align:center;margin-bottom:48px">Our promise to you</h2><div class="three">' +
+  var promisePaid = '<section class="sec m" style="padding:80px 0"><div class="wrap"><h2 class="h2" style="text-align:center;margin-bottom:48px">Our promise to you</h2><div class="three">' +
     '<div class="card"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8B939" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><h3>A clear refund rule</h3><p class="mut">' + esc(refundTxt) + '</p></div>' +
     ('<div class="card"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8B939" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 5a3.5 3.5 0 0 1 0 6.5M18 14.4c2.2.7 3.5 2.6 3.5 5.6"/></svg><h3>If we cancel, you are refunded</h3><p class="mut">If we cancel the event for any reason, you get a full refund.</p></div>') +
     '<div class="card"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8B939" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg><h3>No upsell on the day</h3><p class="mut">The ticket is the whole price. Nothing is sold in the room.</p></div>' +
     '</div></div></section>';
+  var promiseFree = '<section class="sec m" style="padding:80px 0"><div class="wrap"><h2 class="h2" style="text-align:center;margin-bottom:48px">Our promise to you</h2><div class="three">' +
+    '<div class="card"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8B939" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg><h3>Free, no catches</h3><p class="mut">No ticket price, no payment and no card details. Just reserve your seat.</p></div>' +
+    '<div class="card"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8B939" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg><h3>If plans change, you will know</h3><p class="mut">If the date or venue changes, everyone who registered hears from us by email and WhatsApp.</p></div>' +
+    '<div class="card"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8B939" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg><h3>Nothing sold in the room</h3><p class="mut">A community gathering, not a sales event. Come to share, learn and connect.</p></div>' +
+    '</div></div></section>';
+  var promise = free ? promiseFree : promisePaid;
 
   var fq = (ev.faq || []).filter(function(f){ return f && f.q; });
   var faq = fq.length ? '<section class="sec l"><div class="wrap faq"><h2 class="h2" style="margin-bottom:40px">Questions, answered</h2>' +
